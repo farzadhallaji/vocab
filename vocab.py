@@ -144,7 +144,7 @@ class GoogleTranslate(object):
         css_text = """\
         <style type="text/css">
         p {white-space: pre-wrap;}
-        pos {color: #0000FF;}
+        pos {color: #afb7f3;}
         example {color: #008080;}
         gray {color: #606060;}
         </style>"""
@@ -215,7 +215,7 @@ def get_args():
     return parser.parse_args()
 
 from collections import namedtuple
-def create_args(target='en', query='', host='translate.googleapis.com', proxy='', alternative='en', type='html', tkk='', synonyms=True, definitions=True, examples=True):
+def create_args(target='en', query='', host='translate.googleapis.com', proxy='', alternative='en', type='html', tkk='', synonyms=False, definitions=False, examples=False):
     Args = namedtuple('Args', ['target', 'query', 'host', 'proxy', 'alternative', 'type', 'tkk', 'synonyms', 'definitions', 'examples'])
     return Args(target, query, host, proxy, alternative, type, tkk, synonyms, definitions, examples)
 
@@ -240,8 +240,6 @@ for word in words:
   result = await main_async(create_args(query=word, target='fa'))
   word_htmls[word]=result
 
-# Start with a base HTML structure
-# Start with a base HTML structure with dark theme styles
 combined_html = '''
 <!DOCTYPE html>
 <html>
@@ -257,7 +255,6 @@ combined_html = '''
         padding: 0;
         font-size: 16px; /* Default font size for desktop */
     }
-
     .word-container {
         border: 1px solid #a33;
         background-color: #2a2a2a;
@@ -266,12 +263,10 @@ combined_html = '''
         cursor: pointer;
         position: relative;
     }
-
     .word-title {
         flex-grow: 1;
         cursor: pointer;
     }
-
     .mark-read-button {
         background-color: #3a3a3a;
         color: white;
@@ -284,25 +279,21 @@ combined_html = '''
         padding: 5px 10px;
         cursor: pointer;
     }
-
     .content {
         display: none;
         color: #f3f3f3;
         clear: both;
         padding-top: 10px;
     }
-
     .separator {
         width: 100%;
         border-top: 2px solid #a33;
         margin: 20px 0;
     }
-
     .toggle {
         cursor: pointer;
         color: #a33;
     }
-
     .fab {
         padding: 10px 15px;
         color: white;
@@ -313,34 +304,27 @@ combined_html = '''
         bottom: 20px;
         z-index: 1000;
     }
-
     #collapseAllBtn {
         background-color: #a33;
         right: 20px;
     }
-
     #scrollToSeparatorBtn {
         background-color: #3a3a3a;
         right: 140px;
     }
-
     #resetBtn {
         background-color: #4a4a4a;
         left: 20px;
     }
-
     /* Responsive font size for smaller screens */
     @media screen and (max-width: 600px) {
         body {
             font-size: 18px; /* Slightly larger font size for mobile */
         }
-
         .word-container {
             margin: 10px 5px;
             padding: 3px;
         }
-
-
         /* Additional styles for smaller screens */
     }
 </style>
@@ -349,9 +333,11 @@ combined_html = '''
             var element = document.getElementById(id);
             var aboveLine = document.getElementById('aboveLine');
             var belowLine = document.getElementById('belowLine');
-            var targetParent = aboveLine.contains(element) ? belowLine : aboveLine;
+            var movingToAbove = belowLine.contains(element); // Check if the element is in belowLine
+            var movingToBelow = aboveLine.contains(element); // Check if the element is in aboveLine
 
             // Insert the element in the target parent while maintaining order
+            var targetParent = movingToAbove ? aboveLine : belowLine;
             var children = Array.from(targetParent.children);
             var index = children.findIndex(child => parseInt(child.id.replace('word', '')) > parseInt(id.replace('word', '')));
             if (index === -1) {
@@ -360,14 +346,53 @@ combined_html = '''
                 targetParent.insertBefore(element, children[index]);
             }
 
+            // Collapse all contents in both aboveLine and belowLine
+            document.querySelectorAll('.word-container .content').forEach(function(content) {
+                content.style.display = 'none';
+            });
+
+            //automatically expand the first word in belowLine
+            var firstBelow = belowLine.children[0];
+            if (firstBelow) {
+                var firstContent = firstBelow.querySelector('.content');
+                firstContent.style.display = 'block';
+                scrollToElement(firstBelow);
+            }
+
             saveState();
         }
 
+
+
         function toggleContent(id) {
+            var allContents = document.querySelectorAll('.word-container .content');
+            var targetElement = null;
+
+            allContents.forEach(function(content) {
+                if (content.parentNode.id !== id) {
+                    content.style.display = 'none'; // Collapse all other contents
+                } else {
+                    targetElement = content.parentNode; // Target element to scroll to
+                }
+            });
+
             var content = document.getElementById(id).querySelector('.content');
-            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            if (content.style.display === 'none') {
+                content.style.display = 'block'; // Expand the content
+                scrollToElement(targetElement);   // Scroll to the expanded element
+            } else {
+                content.style.display = 'none';
+            }
         }
 
+        function scrollToElement(element) {
+            if (element) {
+                element.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        }
         function saveState() {
             var state = [];
             document.querySelectorAll('.word-container').forEach(function(container) {
@@ -377,12 +402,10 @@ combined_html = '''
             });
             localStorage.setItem('wordState', JSON.stringify(state));
         }
-
         function loadState() {
             var state = JSON.parse(localStorage.getItem('wordState'));
             var aboveLine = document.getElementById('aboveLine');
             var belowLine = document.getElementById('belowLine');
-
             if (state) {
                 state.forEach(function(item) {
                     var element = document.getElementById(item.id);
@@ -403,7 +426,6 @@ combined_html = '''
                 });
             }
         }
-
         window.onload = function() {
             loadState();
         }
@@ -417,8 +439,6 @@ combined_html = '''
                 behavior: 'smooth'
             });
         }
-
-
         function resetLayout() {
             // Move all words back to the original position (belowLine in this case) and collapse their content
             var belowLine = document.getElementById('belowLine');
@@ -426,37 +446,27 @@ combined_html = '''
                 belowLine.appendChild(container); // Move container back to belowLine
                 container.querySelector('.content').style.display = 'none'; // Collapse content
             });
-
             // Clear saved state in localStorage
             localStorage.removeItem('wordState');
-
             // Optionally, you might want to reload the page to ensure a full reset
             window.location.reload();
         }
         document.getElementById('collapseAllBtn').onclick = collapseAll;
-
     </script>
 </head>
 <body>
-
 <div id="aboveLine">
     <!-- Words above the line will go here -->
 </div>
-
 <div class="separator"></div>
-
 <div id="belowLine">
     <!-- Words below the line will go here initially -->
 </div>
-
 <button id="collapseAllBtn" class="fab" onclick="collapseAll()">Collapse All</button>
 <button id="scrollToSeparatorBtn" class="fab" onclick="scrollToSeparator()">Scroll to Separator</button>
 <button id="resetBtn" class="fab" onclick="resetLayout()">Reset Changes</button>
-
 </body>
 </html>
-
-
 '''
 
 # Append each word's HTML to the belowLine div initially
