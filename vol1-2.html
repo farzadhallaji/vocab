@@ -1,0 +1,6337 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    body {
+        background-color: #1e1e1e;
+        color: #cfcfcf;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        font-size: 16px; /* Default font size for desktop */
+    }
+    .word-container {
+        border: 1px solid #a33;
+        background-color: #2a2a2a;
+        margin: 15px;
+        padding: 5px;
+        cursor: pointer;
+        position: relative;
+    }
+    .word-title {
+        flex-grow: 1;
+        cursor: pointer;
+    }
+    .mark-read-button {
+        background-color: #3a3a3a;
+        color: white;
+        border: 1px solid #a33;
+        border-radius: 5px;
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+    .content {
+        display: none;
+        color: #f3f3f3;
+        clear: both;
+        padding-top: 10px;
+    }
+    .separator {
+        width: 100%;
+        border-top: 2px solid #a33;
+        margin: 20px 0;
+    }
+    .toggle {
+        cursor: pointer;
+        color: #a33;
+    }
+    .fab {
+        padding: 10px 15px;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        position: fixed;
+        bottom: 20px;
+        z-index: 1000;
+    }
+    #collapseAllBtn {
+        background-color: #a33;
+        right: 20px;
+    }
+    #scrollToSeparatorBtn {
+        background-color: #3a3a3a;
+        right: 140px;
+    }
+    #resetBtn {
+        background-color: #4a4a4a;
+        left: 20px;
+    }
+    /* Responsive font size for smaller screens */
+    @media screen and (max-width: 600px) {
+        body {
+            font-size: 18px; /* Slightly larger font size for mobile */
+        }
+        .word-container {
+            margin: 10px 5px;
+            padding: 3px;
+        }
+        /* Additional styles for smaller screens */
+    }
+</style>
+<script>
+        function togglePosition(id) {
+            var element = document.getElementById(id);
+            var aboveLine = document.getElementById('aboveLine');
+            var belowLine = document.getElementById('belowLine');
+            var movingToAbove = belowLine.contains(element); // Check if the element is in belowLine
+            var movingToBelow = aboveLine.contains(element); // Check if the element is in aboveLine
+
+            // Insert the element in the target parent while maintaining order
+            var targetParent = movingToAbove ? aboveLine : belowLine;
+            var children = Array.from(targetParent.children);
+            var index = children.findIndex(child => parseInt(child.id.replace('word', '')) > parseInt(id.replace('word', '')));
+            if (index === -1) {
+                targetParent.appendChild(element);
+            } else {
+                targetParent.insertBefore(element, children[index]);
+            }
+
+            // Collapse all contents in both aboveLine and belowLine
+            document.querySelectorAll('.word-container .content').forEach(function(content) {
+                content.style.display = 'none';
+            });
+
+            //automatically expand the first word in belowLine
+            var firstBelow = belowLine.children[0];
+            if (firstBelow) {
+                var firstContent = firstBelow.querySelector('.content');
+                firstContent.style.display = 'block';
+                scrollToElement(firstBelow);
+            }
+
+            saveState();
+        }
+
+
+
+        function toggleContent(id) {
+            var allContents = document.querySelectorAll('.word-container .content');
+            var targetElement = null;
+
+            allContents.forEach(function(content) {
+                if (content.parentNode.id !== id) {
+                    content.style.display = 'none'; // Collapse all other contents
+                } else {
+                    targetElement = content.parentNode; // Target element to scroll to
+                }
+            });
+
+            var content = document.getElementById(id).querySelector('.content');
+            if (content.style.display === 'none') {
+                content.style.display = 'block'; // Expand the content
+                scrollToElement(targetElement);   // Scroll to the expanded element
+            } else {
+                content.style.display = 'none';
+            }
+        }
+
+        function scrollToElement(element) {
+            if (element) {
+                element.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        }
+        function saveState() {
+            var state = [];
+            document.querySelectorAll('.word-container').forEach(function(container) {
+                var isAbove = document.getElementById('aboveLine').contains(container);
+                var isCollapsed = container.querySelector('.content').style.display === 'none';
+                state.push({id: container.id, isAbove: isAbove, isCollapsed: isCollapsed});
+            });
+            localStorage.setItem('wordState', JSON.stringify(state));
+        }
+        function loadState() {
+            var state = JSON.parse(localStorage.getItem('wordState'));
+            var aboveLine = document.getElementById('aboveLine');
+            var belowLine = document.getElementById('belowLine');
+            if (state) {
+                state.forEach(function(item) {
+                    var element = document.getElementById(item.id);
+                    if (element) {
+                        if (item.isAbove) {
+                            aboveLine.appendChild(element);
+                        } else {
+                            belowLine.appendChild(element);
+                        }
+                        var contentDisplay = item.isCollapsed ? 'none' : 'block';
+                        element.querySelector('.content').style.display = contentDisplay;
+                    }
+                });
+            } else {
+                // If there is no saved state, keep all content divs collapsed
+                document.querySelectorAll('.word-container .content').forEach(function(content) {
+                    content.style.display = 'none';
+                });
+            }
+        }
+        window.onload = function() {
+            loadState();
+        }
+        function collapseAll() {
+            document.querySelectorAll('.word-container .content').forEach(function(content) {
+                content.style.display = 'none';
+            });
+        }
+        function scrollToSeparator() {
+            document.querySelector('.separator').scrollIntoView({
+                behavior: 'smooth'
+            });
+        }
+        function resetLayout() {
+            // Move all words back to the original position (belowLine in this case) and collapse their content
+            var belowLine = document.getElementById('belowLine');
+            document.querySelectorAll('.word-container').forEach(function(container) {
+                belowLine.appendChild(container); // Move container back to belowLine
+                container.querySelector('.content').style.display = 'none'; // Collapse content
+            });
+            // Clear saved state in localStorage
+            localStorage.removeItem('wordState');
+            // Optionally, you might want to reload the page to ensure a full reset
+            window.location.reload();
+        }
+        document.getElementById('collapseAllBtn').onclick = collapseAll;
+    </script>
+</head>
+<body>
+<div id="aboveLine">
+    <!-- Words above the line will go here -->
+</div>
+<div class="separator"></div>
+<div id="belowLine">
+    <!-- Words below the line will go here initially -->
+</div>
+<button id="collapseAllBtn" class="fab" onclick="collapseAll()">Collapse All</button>
+<button id="scrollToSeparatorBtn" class="fab" onclick="scrollToSeparator()">Scroll to Separator</button>
+<button id="resetBtn" class="fab" onclick="resetLayout()">Reset Changes</button>
+</body>
+</html>
+
+<div id="word1" class="word-container">
+    <div class="word-title" onclick="toggleContent('word1')"><span class="toggle">></span> absorb</div>
+    <button class="mark-read-button" onclick="togglePosition('word1')">mark</button>
+    <div class="content" onclick="toggleContent('word1')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+absorb
+---------
+جذب
+
+=========
+<gray>0_0: Translations of</gray> absorb
+<pos><b># v.</b></pos>
+جذب کردن: attract, absorb, imbibe, amuse, imbrue, intussuscept
+جذب شدن: absorb
+فرا گرفتن: learn, engulf, absorb, adopt, comprehend, envelop
+در اشامیدن: absorb
+کاملا فرو بردن: absorb
+تحليل كردن: absorb
+مجذوب شدن در: absorb
+در کشیدن: absorb, imbibe, inbreathe
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word2" class="word-container">
+    <div class="word-title" onclick="toggleContent('word2')"><span class="toggle">></span> accompany</div>
+    <button class="mark-read-button" onclick="togglePosition('word2')">mark</button>
+    <div class="content" onclick="toggleContent('word2')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+accompany
+---------
+همراهی کردن
+
+=========
+<gray>0_0: Translations of</gray> accompany
+<pos><b># v.</b></pos>
+همراهی کردن: accompany, squire, go along, companion
+همراه بودن: accompany, attend
+جفت کردن: mortise, dovetail, couple, accompany, assemble, geminate
+ضمیمه کردن: attach, annex, add, tack, affix, accompany
+توام کردن: amalgamate, accompany, geminate, twin
+دم گرفتن: accompany
+صدا یا ساز را جفت کردن: accompany
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word3" class="word-container">
+    <div class="word-title" onclick="toggleContent('word3')"><span class="toggle">></span> accuse</div>
+    <button class="mark-read-button" onclick="togglePosition('word3')">mark</button>
+    <div class="content" onclick="toggleContent('word3')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+accuse
+---------
+متهم کردن
+
+=========
+<gray>0_0: Translations of</gray> accuse
+<pos><b># v.</b></pos>
+متهم کردن: accuse, incriminate, indict, denounce, impute, criminate
+متهم ساختن: accuse, charge
+تهمت زدن: slander, accuse, scandal, task, trump up
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word4" class="word-container">
+    <div class="word-title" onclick="toggleContent('word4')"><span class="toggle">></span> adequate</div>
+    <button class="mark-read-button" onclick="togglePosition('word4')">mark</button>
+    <div class="content" onclick="toggleContent('word4')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+adequate
+---------
+کافی است
+
+=========
+<gray>0_0: Translations of</gray> adequate
+<pos><b># a.</b></pos>
+کافی: enough, sufficient, adequate
+متناسب: proportional, proportionate, commensurate, adequate, symmetric, symmetrical
+مناسب: suitable, appropriate, proper, convenient, adequate, fit
+بسنده: sufficient, adequate, enough
+مساوی: equal, alike, identical, even, level, adequate
+لایق: capable, worthy, competent, able, adequate
+رسا: expressive, loud, stentorian, audible, orotund, adequate
+تکافو کننده: adequate
+صلاحیت دار: able, adequate, capable, sufficient
+<pos><b># v.</b></pos>
+متساوی بودن: adequate
+مساوی ساختن: adequate
+شایسته بودن: adequate, behoove, behove, beseem, merit, fit
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word5" class="word-container">
+    <div class="word-title" onclick="toggleContent('word5')"><span class="toggle">></span> advertise</div>
+    <button class="mark-read-button" onclick="togglePosition('word5')">mark</button>
+    <div class="content" onclick="toggleContent('word5')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+advertise
+---------
+تبلیغات
+
+=========
+<gray>0_0: Translations of</gray> advertise
+<pos><b># v.</b></pos>
+اگهی دادن: advertise, announce
+اعلان کردن: proclaim, announce, advertise, declare, give out
+انتشار دادن: issue, advertise, announce, promulgate, propagate
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word6" class="word-container">
+    <div class="word-title" onclick="toggleContent('word6')"><span class="toggle">></span> advice</div>
+    <button class="mark-read-button" onclick="togglePosition('word6')">mark</button>
+    <div class="content" onclick="toggleContent('word6')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+advice
+---------
+مشاوره
+
+=========
+<gray>0_0: Translations of</gray> advice
+<pos><b># n.</b></pos>
+مشورت: consultation, advice, counsel, deliberation, advisement, rede
+نصیحت: advice, exhortation, admonition, protreptic, talking to
+اندرز: advice, counsel, monition, sermon, axiom, motto
+نظر: opinion, view, look, regard, viewpoint, advice
+پند: advice, exhortation, saying, maxim, motto, axiom
+رایزنی: consultation, advice, counsel
+خبر: news, report, announcement, information, word, advice
+مصلحت: interest, benefit, advice, goodwill, good intention, rede
+صوابدید: advice
+اگاهی: knowledge, awareness, consciousness, inkling, intelligence, advice
+اطلاع: information, notice, notification, knowledge, awareness, advice
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word7" class="word-container">
+    <div class="word-title" onclick="toggleContent('word7')"><span class="toggle">></span> advise</div>
+    <button class="mark-read-button" onclick="togglePosition('word7')">mark</button>
+    <div class="content" onclick="toggleContent('word7')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+advise
+---------
+توصیه
+
+=========
+<gray>0_0: Translations of</gray> advise
+<pos><b># v.</b></pos>
+مشورت دادن: advise
+نصیحت کردن: advise, admonish, exhort, preach
+توصیه دادن: advise
+پند دادن: advise, admonish, counsel
+اگاهانیدن: advise
+قضاوت کردن: judge, advise
+رایزنی کردن: advise, consult
+خبر دادن: advise, announce, give notice, inform, send word, warn
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word8" class="word-container">
+    <div class="word-title" onclick="toggleContent('word8')"><span class="toggle">></span> afford</div>
+    <button class="mark-read-button" onclick="togglePosition('word8')">mark</button>
+    <div class="content" onclick="toggleContent('word8')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+afford
+---------
+استطاعت داشتن
+
+=========
+<gray>0_0: Translations of</gray> afford
+<pos><b># v.</b></pos>
+دادن: give, give, grant, admit, impute, afford
+حاصل کردن: obtain, acquire, afford, generate, get
+تهیه کردن: cater, provide, furnish, process, purvey, afford
+موجب شدن: cause, afford, bring, entail, evince, inure
+از عهده برامدن: cope, tackle, acquit, afford, answer
+استطاعت داشتن: afford
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word9" class="word-container">
+    <div class="word-title" onclick="toggleContent('word9')"><span class="toggle">></span> ahead</div>
+    <button class="mark-read-button" onclick="togglePosition('word9')">mark</button>
+    <div class="content" onclick="toggleContent('word9')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+ahead
+---------
+در پیش
+
+=========
+<gray>0_0: Translations of</gray> ahead
+<pos><b># a.</b></pos>
+پیش: ago, ahead, forward, in advance, past, beforehand
+جلو: forward, ahead, forth, up, before, afore
+در امتداد حرکت کسی: ahead
+روبجلو: ahead
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word10" class="word-container">
+    <div class="word-title" onclick="toggleContent('word10')"><span class="toggle">></span> amuse</div>
+    <button class="mark-read-button" onclick="togglePosition('word10')">mark</button>
+    <div class="content" onclick="toggleContent('word10')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+amuse
+---------
+سرگرم کردن
+
+=========
+<gray>0_0: Translations of</gray> amuse
+<pos><b># v.</b></pos>
+مات و متحیر کردن: amuse
+سرگرم کردن: entertain, amuse, inveigle, occupy, make tipsy, please
+مشغول کردن: engage, busy, amuse, employ, entertain, occupy
+تفریح دادن: amuse, entertain, recreate
+جذب کردن: attract, absorb, imbibe, amuse, imbrue, intussuscept
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word11" class="word-container">
+    <div class="word-title" onclick="toggleContent('word11')"><span class="toggle">></span> appliance</div>
+    <button class="mark-read-button" onclick="togglePosition('word11')">mark</button>
+    <div class="content" onclick="toggleContent('word11')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+appliance
+---------
+دستگاه
+
+=========
+<gray>0_0: Translations of</gray> appliance
+<pos><b># n.</b></pos>
+وسیله: instrument, medium, appliance, facility, organ, handle
+اسباب: rigging, rig, furniture, gadget, instrument, appliance
+الت: instrument, organ, tool, apparatus, appliance, engine
+اختراع: invention, contraption, device, fiction, artifice, appliance
+تعبیه: preparation, improvisation, shebang, appliance, shift, lash-up
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word12" class="word-container">
+    <div class="word-title" onclick="toggleContent('word12')"><span class="toggle">></span> ashamed</div>
+    <button class="mark-read-button" onclick="togglePosition('word12')">mark</button>
+    <div class="content" onclick="toggleContent('word12')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+ashamed
+---------
+شرمنده
+
+=========
+<gray>0_0: Translations of</gray> ashamed
+<pos><b># a.</b></pos>
+شرمنده: ashamed
+شرمسار: ashamed
+خجل: ashamed, embarrassed, shy, confused
+سرافکنده: ashamed, abject, confused, abased
+رسوا: infamous, blatant, ignominious, ashamed, opprobrious
+سردرپیش: blushed, ashamed, hanging the head, shameful
+ننگ اور: ashamed, discreditable, ignominious, opprobrious
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word13" class="word-container">
+    <div class="word-title" onclick="toggleContent('word13')"><span class="toggle">></span> associate</div>
+    <button class="mark-read-button" onclick="togglePosition('word13')">mark</button>
+    <div class="content" onclick="toggleContent('word13')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+associate
+---------
+وابسته
+
+=========
+<gray>0_0: Translations of</gray> associate
+<pos><b># a.</b></pos>
+وابسته: dependent, affiliate, related, interdependent, attached, associate
+هم پیوند: associate
+همبسته: correlated, associate
+دانشبهری: associate
+<pos><b># n.</b></pos>
+شریک: partner, associate, participant, sharer, joint, copartner
+معاون: helper, assistant, assistant director, associate, coadjutor, vicar
+عضو پیوسته: associate
+همسر: spouse, consort, partner, mate, match, associate
+رفیق: comrade, friend, pal, fellow, buddy, associate
+هم دست: accomplice, collaborator, complice, adjoint, aid, associate
+هم قطار: colleague, teammate, associate, brother, confrere, co-worker
+<pos><b># v.</b></pos>
+شریک کردن: associate
+مصاحبت کردن: associate, keep company
+وابسته کردن: associate
+امیزش کردن: admix, associate, intercommunicate
+همدم شدن: associate
+پیوستن: join, adhere, connect, attach, meet, associate
+مربوط ساختن: associate, affiliate
+معاشرت کردن: associate, communicate, intercommunicate, companion
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word14" class="word-container">
+    <div class="word-title" onclick="toggleContent('word14')"><span class="toggle">></span> attend</div>
+    <button class="mark-read-button" onclick="togglePosition('word14')">mark</button>
+    <div class="content" onclick="toggleContent('word14')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+attend
+---------
+مراجعه كردن
+
+=========
+<gray>0_0: Translations of</gray> attend
+<pos><b># v.</b></pos>
+حضور داشتن: attend
+رسیدگی کردن: consider, attend, check, inspect, investigate, investigate
+توجه کردن: attend, note, advert, figure on, tent, ward
+مواظبت کردن: attend, mind, take care
+گوش کردن: hear, attend
+در ملازمت کسی بودن: attend
+همراه بودن: accompany, attend
+در پی چیزی بودن: attend
+از دنبال امدن: ensue, attend
+انتظار کشیدن: wait, attend
+انتظار داشتن: expect, envisage, hold forth, anticipate, attend, await
+پرستاری کردن: attend, minister, nurse, tend
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word15" class="word-container">
+    <div class="word-title" onclick="toggleContent('word15')"><span class="toggle">></span> attitude</div>
+    <button class="mark-read-button" onclick="togglePosition('word15')">mark</button>
+    <div class="content" onclick="toggleContent('word15')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+attitude
+---------
+نگرش
+
+=========
+<gray>0_0: Translations of</gray> attitude
+<pos><b># n.</b></pos>
+گرایش: trend, tendency, orientation, propensity, attitude, tropism
+طرز برخورد: attitude, relation
+حالت: state, case, condition, situation, mood, attitude
+روش و رفتار: attitude
+هیئت: panel, commission, staff, attitude, format
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word16" class="word-container">
+    <div class="word-title" onclick="toggleContent('word16')"><span class="toggle">></span> bare</div>
+    <button class="mark-read-button" onclick="togglePosition('word16')">mark</button>
+    <div class="content" onclick="toggleContent('word16')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+bare
+---------
+برهنه
+
+=========
+<gray>0_0: Translations of</gray> bare
+<pos><b># a.</b></pos>
+لخت: bare, naked, nude, revealed, lumpish, picked
+عریان: naked, bare, nude, bald
+ساده: simple, easy, plain, naive, modest, bare
+عاری: free, devoid, void, bare, destitute, exempt
+اشکار: clear, manifest, obvious, plain, apparent, bare
+<pos><b># v.</b></pos>
+برهنه کردن: disrobe, bare, denude, strip, uncover
+اشکار کردن: unfold, reveal, air, announce, bare, disclose
+عاری ساختن: bare, denude
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word17" class="word-container">
+    <div class="word-title" onclick="toggleContent('word17')"><span class="toggle">></span> basement</div>
+    <button class="mark-read-button" onclick="togglePosition('word17')">mark</button>
+    <div class="content" onclick="toggleContent('word17')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+basement
+---------
+زیر زمین
+
+=========
+<gray>0_0: Translations of</gray> basement
+<pos><b># n.</b></pos>
+زیر زمین: underground, basement, cellar, subbasement
+سرداب: cellar, basement, hypogeum
+سردابه: vault, crypt, basement, subbasement
+طبقه زیر: basement, substratum, semibasement
+بن: root, bottom, basement
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word18" class="word-container">
+    <div class="word-title" onclick="toggleContent('word18')"><span class="toggle">></span> basin</div>
+    <button class="mark-read-button" onclick="togglePosition('word18')">mark</button>
+    <div class="content" onclick="toggleContent('word18')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+basin
+---------
+حوضه
+
+=========
+<gray>0_0: Translations of</gray> basin
+<pos><b># n.</b></pos>
+حوزه رودخانه: basin
+لگن: basin, laver, chamber pot, finger bowl
+تشتک: basin, washbasin
+دستشویی: lavatory, basin, washstand
+ابگیر: sluice, basin, penstock, pool, weathering
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word19" class="word-container">
+    <div class="word-title" onclick="toggleContent('word19')"><span class="toggle">></span> battle</div>
+    <button class="mark-read-button" onclick="togglePosition('word19')">mark</button>
+    <div class="content" onclick="toggleContent('word19')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+battle
+---------
+نبرد
+
+=========
+<gray>0_0: Translations of</gray> battle
+<pos><b># n.</b></pos>
+نبرد: battle, fight, combat, conflict, action, fray
+جنگ: war, battle, warfare, fight, anthology, belligerence
+مبارزه: struggle, combat, battle, swordplay, championship
+مصاف: battle, combat, battlefield, rencounter, ranks of warriors
+نزاع: strife, quarrel, dispute, fray, battle, contention
+جدال: battle, controversy
+پیکار: fight, battle, combat, action, quarrel
+رزم: combat, battle, war
+محاربه: war, combat, battle, belligerence, warfare
+زد و خورد: skirmish, medley, fracas, fight, battle, warfare
+<pos><b># v.</b></pos>
+جنگ کردن: war, fight, fray, battle
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word20" class="word-container">
+    <div class="word-title" onclick="toggleContent('word20')"><span class="toggle">></span> bow</div>
+    <button class="mark-read-button" onclick="togglePosition('word20')">mark</button>
+    <div class="content" onclick="toggleContent('word20')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+bow
+---------
+تعظیم
+
+=========
+<gray>0_0: Translations of</gray> bow
+<pos><b># n.</b></pos>
+تعظیم: bow, obeisance, inclining, curtsey, curtsy
+کمان: arc, arch, bow, fiddlestick
+قوس: arc, arch, bow, chord, archer
+سجود: bow, adoration, genuflection, worship
+<pos><b># v.</b></pos>
+سرتکان دادن: nod, beck, bow
+خم شدن: bend, stoop, sag, recline, leant, bow
+تعظیم کردن: bow, beck, bend
+خم کردن: bend, crook, flex, wry, crank, bow
+سر فرود اوردن: bow
+خمیده شدن: bow
+خمیدن: bend, bow, cripple, decline, halt, hobble
+سجود کردن: bow, genuflect
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word21" class="word-container">
+    <div class="word-title" onclick="toggleContent('word21')"><span class="toggle">></span> bowl</div>
+    <button class="mark-read-button" onclick="togglePosition('word21')">mark</button>
+    <div class="content" onclick="toggleContent('word21')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+bowl
+---------
+کاسه
+
+=========
+<gray>0_0: Translations of</gray> bowl
+<pos><b># n.</b></pos>
+کاسه: bowl, socket, drinking cup, chalice, mazer
+جام: cup, Grail, goblet, bowl, chalice, glass
+پیاله: cup, bowl, chalice, beaker, horn, porringer
+قدح: tun, bowl
+طاس: bowl, die, dib, porringer
+کاسه رهنما: bowl
+<pos><b># v.</b></pos>
+با توپ بازی کردن: bowl
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word22" class="word-container">
+    <div class="word-title" onclick="toggleContent('word22')"><span class="toggle">></span> breadth</div>
+    <button class="mark-read-button" onclick="togglePosition('word22')">mark</button>
+    <div class="content" onclick="toggleContent('word22')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+breadth
+---------
+وسعت
+
+=========
+<gray>0_0: Translations of</gray> breadth
+<pos><b># n.</b></pos>
+پهنا: width, breadth, expanse
+عرض: width, latitude, breadth, petition, ordinate, presentation
+وسعت نظر: breadth, largess, liberalism
+عریضی: breadth, width
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word23" class="word-container">
+    <div class="word-title" onclick="toggleContent('word23')"><span class="toggle">></span> breed</div>
+    <button class="mark-read-button" onclick="togglePosition('word23')">mark</button>
+    <div class="content" onclick="toggleContent('word23')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+breed
+---------
+نژاد
+
+=========
+<gray>0_0: Translations of</gray> breed
+<pos><b># n.</b></pos>
+گونه: kind, species, type, cheek, form, breed
+جنس: gender, genus, material, kind, stuff, breed
+نوع: type, kind, sort, species, nature, breed
+اعقاب: posterity, lineage, breed
+اولاد: offsprings, posterity, breed, issue, progenies, seeds
+<pos><b># v.</b></pos>
+پروردن: nurture, foster, breed, bring up, cherish, encourage
+بار اوردن: breed, raise
+زاییدن: generate, calve, bear, teem, breed, produce
+بدنیا آوردن: breed
+تولید کردن: produce, generate, turn out, procreate, beget, breed
+تربیت کردن: breed, educate, train, abet, rear, school
+پرورش دادن: foster, develop, bring up, breed
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word24" class="word-container">
+    <div class="word-title" onclick="toggleContent('word24')"><span class="toggle">></span> broom</div>
+    <button class="mark-read-button" onclick="togglePosition('word24')">mark</button>
+    <div class="content" onclick="toggleContent('word24')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+broom
+---------
+جارو
+
+=========
+<gray>0_0: Translations of</gray> broom
+<pos><b># n.</b></pos>
+جاروب: broom, swab, erica
+<pos><b># v.</b></pos>
+جاروب کردن: sweep, wisp, broom, scavenge, whisk
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word25" class="word-container">
+    <div class="word-title" onclick="toggleContent('word25')"><span class="toggle">></span> broomstick</div>
+    <button class="mark-read-button" onclick="togglePosition('word25')">mark</button>
+    <div class="content" onclick="toggleContent('word25')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+broomstick
+---------
+چوب جارو
+
+=========
+<gray>0_0: Translations of</gray> broomstick
+<pos><b># n.</b></pos>
+دسته جاروب: broomstick
+خاده: neckcloth, broomstick, dog hook, fire hook, gaff, gallows
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word26" class="word-container">
+    <div class="word-title" onclick="toggleContent('word26')"><span class="toggle">></span> brush</div>
+    <button class="mark-read-button" onclick="togglePosition('word26')">mark</button>
+    <div class="content" onclick="toggleContent('word26')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+brush
+---------
+قلم مو
+
+=========
+<gray>0_0: Translations of</gray> brush
+<pos><b># n.</b></pos>
+قلم مو: brush
+لیف: fiber, filament, brush, phloem, fibre
+ماهوت پاک کن: whisk, whisk broom, brush, whisk brush
+پاک کن: eraser, mop, wiper, brush, rubber
+ملامت: reproach, rebuke, reproof, brush, call-down
+خس: straw, lettuce, brash, brush, hilding, brushwood
+علف هرزه: brush, weed
+بروس لوله: brush
+کفش پاک کن و مانند ان: brush
+<pos><b># v.</b></pos>
+مسواک زدن: brush
+لیف زدن: brush
+نقاشی کردن: paint, contour, crayon, brush, picture
+ماهوت پاک کن زدن: whisk, brush
+قلم مو زدن: brush
+تند گذشتن: brush
+خار کردن: brush, comb, trick
+تماس حاصل کردن و اهسته گذشتن: brush
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word27" class="word-container">
+    <div class="word-title" onclick="toggleContent('word27')"><span class="toggle">></span> burden</div>
+    <button class="mark-read-button" onclick="togglePosition('word27')">mark</button>
+    <div class="content" onclick="toggleContent('word27')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+burden
+---------
+بار
+
+=========
+<gray>0_0: Translations of</gray> burden
+<pos><b># n.</b></pos>
+بار: load, bar, burden, charge, cargo, loading
+مسئوليت: responsibility, liability, charge, accountability, burden, office
+بار مسئوليت: burden
+وزن: rhythm, burden, cadence, scale, avoirdupois, charge
+گنجایش: capacity, inclusion, content, caliber, burden, module
+طفل در رحم: burden
+<pos><b># v.</b></pos>
+بار کردن: load, burden, fill, freight, lade, pack
+تحمیل کردن: impose, inflict, protrude, burden, constrain, horn in
+سنگین بار کردن: burden
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word28" class="word-container">
+    <div class="word-title" onclick="toggleContent('word28')"><span class="toggle">></span> bush</div>
+    <button class="mark-read-button" onclick="togglePosition('word28')">mark</button>
+    <div class="content" onclick="toggleContent('word28')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+bush
+---------
+بوته
+
+=========
+<gray>0_0: Translations of</gray> bush
+<pos><b># n.</b></pos>
+بوته: bush, underbrush, shrub, heath, herb, brushwood
+بته: bush, test, bosk
+شاخ و برگ: foliage, herbage, tod, bush
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word29" class="word-container">
+    <div class="word-title" onclick="toggleContent('word29')"><span class="toggle">></span> carriage</div>
+    <button class="mark-read-button" onclick="togglePosition('word29')">mark</button>
+    <div class="content" onclick="toggleContent('word29')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+carriage
+---------
+کالسکه
+
+=========
+<gray>0_0: Translations of</gray> carriage
+<pos><b># n.</b></pos>
+کالسکه: carriage, coach, brougham, stagecoach
+نورد: roll, roller, carriage
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word30" class="word-container">
+    <div class="word-title" onclick="toggleContent('word30')"><span class="toggle">></span> cast</div>
+    <button class="mark-read-button" onclick="togglePosition('word30')">mark</button>
+    <div class="content" onclick="toggleContent('word30')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+cast
+---------
+قالب
+
+=========
+<gray>0_0: Translations of</gray> cast
+<pos><b># n.</b></pos>
+قالب: format, template, mold, cast, model, case
+گچ گیری: cast
+مهره ریزی: cast
+طاساندازی: cast
+<pos><b># v.</b></pos>
+انداختن: drop, throw, cast, put, launch, toss
+ریختن: shed, pour, infuse, cast, splash, decant
+در قالب قرار دادن: cast
+معین کردن: determine, ascertain, define, specify, designate, cast
+پخش کردن: spread, distribute, diffuse, broadcast, scatter, cast
+افکندن: cast, shed, throw, droop, fling, give
+بشکل در اوردن: cast, fashion, form
+<pos><b># a.</b></pos>
+مطرود: despicable, outcast, rejected, banished, expelled, cast
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word31" class="word-container">
+    <div class="word-title" onclick="toggleContent('word31')"><span class="toggle">></span> caterpillar</div>
+    <button class="mark-read-button" onclick="togglePosition('word31')">mark</button>
+    <div class="content" onclick="toggleContent('word31')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+caterpillar
+---------
+کرم ابریشم
+
+=========
+<gray>0_0: Translations of</gray> caterpillar
+<pos><b># n.</b></pos>
+خون اشام: vampire, caterpillar, bloodsucker, wringer, lamia, leech
+کرم صدپا: caterpillar
+تراکتور زنجیری: caterpillar
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word32" class="word-container">
+    <div class="word-title" onclick="toggleContent('word32')"><span class="toggle">></span> charitable</div>
+    <button class="mark-read-button" onclick="togglePosition('word32')">mark</button>
+    <div class="content" onclick="toggleContent('word32')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+charitable
+---------
+خیریه
+
+=========
+<gray>0_0: Translations of</gray> charitable
+<pos><b># a.</b></pos>
+خیریه: charitable, charitable, philanthropic, benevolent, philanthropical, Samaritan
+سخی: generous, charitable, liberal, bounteous, bountiful, big-hearted
+خوشدل: gleeful, benevolent, charitable, boon, gay, gaysome
+سخاوتمند: lavish, bounteous, magnanimous, munificent, charitable, noble
+مهربان: kind, merciful, gentle, compassionate, friendly, charitable
+دستگیر: captive, charitable, caitiff
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word33" class="word-container">
+    <div class="word-title" onclick="toggleContent('word33')"><span class="toggle">></span> chase</div>
+    <button class="mark-read-button" onclick="togglePosition('word33')">mark</button>
+    <div class="content" onclick="toggleContent('word33')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+chase
+---------
+تعقیب
+
+=========
+<gray>0_0: Translations of</gray> chase
+<pos><b># n.</b></pos>
+تعقیب: chase, pursuit, following, action, tailing, continuation
+شکار: prey, hunt, predation, catch, chase, game
+<pos><b># v.</b></pos>
+وادار به فرار کردن: chase
+دنبال کردن: pursue, follow, track, trace, chase, follow out
+تعقیب کردن: pursue, chase, follow, chevy, sue, chivvy
+شکار کردن: hunt, chase
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word34" class="word-container">
+    <div class="word-title" onclick="toggleContent('word34')"><span class="toggle">></span> cheered</div>
+    <button class="mark-read-button" onclick="togglePosition('word34')">mark</button>
+    <div class="content" onclick="toggleContent('word34')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+cheered
+---------
+تشویق کرد
+
+=========
+<gray>0_0: Translations of</gray> cheered
+<pos><b># v.</b></pos>
+تشویق کردن: encourage, cheer, countenance, abet, patronize, eulogize
+هلهله کردن: cheer, applaud, maffick
+دلخوشی دادن: cheer
+ترغیب کردن: persuade, encourage, cheer, harp, influence, put
+بر انگیختن: prod, arouse, infuse, roust, excite, stimulate
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word35" class="word-container">
+    <div class="word-title" onclick="toggleContent('word35')"><span class="toggle">></span> chew</div>
+    <button class="mark-read-button" onclick="togglePosition('word35')">mark</button>
+    <div class="content" onclick="toggleContent('word35')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+chew
+---------
+جویدن
+
+=========
+<gray>0_0: Translations of</gray> chew
+<pos><b># v.</b></pos>
+جویدن: chew, munch, champ, chaw, masticate, fret
+خاییدن: gnaw, chew, masticate
+تفکر کردن: meditate, contemplate, consider, ponder, chew, imagine
+<pos><b># n.</b></pos>
+نشخوار: rumination, champ, quid, cud, chew
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word36" class="word-container">
+    <div class="word-title" onclick="toggleContent('word36')"><span class="toggle">></span> clay</div>
+    <button class="mark-read-button" onclick="togglePosition('word36')">mark</button>
+    <div class="content" onclick="toggleContent('word36')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+clay
+---------
+خاک رس
+
+=========
+<gray>0_0: Translations of</gray> clay
+<pos><b># n.</b></pos>
+رس: clay
+خاک رس: clay, bole, argil, pug
+گل: flower, mud, clay, blossom, silt, slob
+سفال: clay, earthenware, tile, shard, terracotta
+خاک کوزه گری: clay, potter's clay
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word37" class="word-container">
+    <div class="word-title" onclick="toggleContent('word37')"><span class="toggle">></span> comfort</div>
+    <button class="mark-read-button" onclick="togglePosition('word37')">mark</button>
+    <div class="content" onclick="toggleContent('word37')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+comfort
+---------
+راحتی
+
+=========
+<gray>0_0: Translations of</gray> comfort
+<pos><b># n.</b></pos>
+راحت: comfort, tranquility, tranquillity
+مایه تسلی: comfort, solace
+اسایش: comfort, easement, rest, welfare, weal
+اسودگی: relief, tranquility, convenience, comfort, ease, leisure
+<pos><b># v.</b></pos>
+دلداری دادن: comfort, console
+اسایش دادن: comfort
+تسهیل کردن: facilitate, comfort, simplify
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word38" class="word-container">
+    <div class="word-title" onclick="toggleContent('word38')"><span class="toggle">></span> commute</div>
+    <button class="mark-read-button" onclick="togglePosition('word38')">mark</button>
+    <div class="content" onclick="toggleContent('word38')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+commute
+---------
+رفت و آمد
+
+=========
+<gray>0_0: Translations of</gray> commute
+<pos><b># v.</b></pos>
+تبدیل کردن: turn, convert, transform, transmute, change, commute
+مسافرت کردن: travel, barnstorm, commute
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word39" class="word-container">
+    <div class="word-title" onclick="toggleContent('word39')"><span class="toggle">></span> compromise</div>
+    <button class="mark-read-button" onclick="togglePosition('word39')">mark</button>
+    <div class="content" onclick="toggleContent('word39')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+compromise
+---------
+به خطر افتادن
+
+=========
+<gray>0_0: Translations of</gray> compromise
+<pos><b># n.</b></pos>
+سازش: compromise, peace, agreement, collusion, accord, accordance
+مصالحه: compromise, reconciliation, conciliation, accord
+توافق: agreement, compromise, settlement, accord, accord, understanding
+تراضی: compromise
+<pos><b># v.</b></pos>
+مصالحه کردن: compromise
+سازش کردن: compromise, agree, collude, complot, make a deal, reach an agreement
+تسویه کردن: defray, compromise, liquidate, liquidize, pay off, settle
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word40" class="word-container">
+    <div class="word-title" onclick="toggleContent('word40')"><span class="toggle">></span> contain</div>
+    <button class="mark-read-button" onclick="togglePosition('word40')">mark</button>
+    <div class="content" onclick="toggleContent('word40')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+contain
+---------
+حاوی
+
+=========
+<gray>0_0: Translations of</gray> contain
+<pos><b># v.</b></pos>
+دارا بودن: have, contain, possess, own, enjoy, encompass
+شامل بودن: include, contain, subtend, comprise, consist, embrace
+محتوی بودن: contain
+باز داشتن: deter, encumber, prevent, debar, arrest, contain
+محدود نگاهداشتن: contain
+متضمن بودن: comprise, contain, embody, include, presuppose, entail
+در برداشتن: comprise, bear, comport, contain, embody, encircle
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word41" class="word-container">
+    <div class="word-title" onclick="toggleContent('word41')"><span class="toggle">></span> contribute</div>
+    <button class="mark-read-button" onclick="togglePosition('word41')">mark</button>
+    <div class="content" onclick="toggleContent('word41')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+contribute
+---------
+مشارکت
+
+=========
+<gray>0_0: Translations of</gray> contribute
+<pos><b># v.</b></pos>
+اعانه دادن: chip in, contribute
+شرکت کردن در: chip in, contribute
+همکاری و کمک کردن: chip in, contribute
+هم بخشی کردن: chip in, contribute
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word42" class="word-container">
+    <div class="word-title" onclick="toggleContent('word42')"><span class="toggle">></span> convey</div>
+    <button class="mark-read-button" onclick="togglePosition('word42')">mark</button>
+    <div class="content" onclick="toggleContent('word42')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+convey
+---------
+انتقال
+
+=========
+<gray>0_0: Translations of</gray> convey
+<pos><b># v.</b></pos>
+رساندن: convey, supply, transmit, extend, give, broadcast
+نقل کردن: convey, account, quote, relate, transcribe, tell
+بردن: take, remove, win, take away, carry, convey
+حمل کردن: carry, transport, bear, haul, portage, convey
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word43" class="word-container">
+    <div class="word-title" onclick="toggleContent('word43')"><span class="toggle">></span> convict</div>
+    <button class="mark-read-button" onclick="togglePosition('word43')">mark</button>
+    <div class="content" onclick="toggleContent('word43')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+convict
+---------
+محکوم
+
+=========
+<gray>0_0: Translations of</gray> convict
+<pos><b># n.</b></pos>
+محکوم: convict, jailbird, chummy, con, geezo, lag
+مجرم: convict, wrongdoer
+جانی: criminal, felon, convict, bane, highbinder, malefactor
+محبوس: convict, jailbird
+<pos><b># v.</b></pos>
+محکوم کردن: condemn, convict, sentence, adjudge, attaint
+سرزنش یا متهم کردن: convict
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word44" class="word-container">
+    <div class="word-title" onclick="toggleContent('word44')"><span class="toggle">></span> corn</div>
+    <button class="mark-read-button" onclick="togglePosition('word44')">mark</button>
+    <div class="content" onclick="toggleContent('word44')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+corn
+---------
+ذرت
+
+=========
+<gray>0_0: Translations of</gray> corn
+<pos><b># n.</b></pos>
+ذرت: corn, maize, Indian corn
+دانه ذرت: corn
+غله: grain, corn, cereal
+<pos><b># v.</b></pos>
+دانه دانه کردن: granulate, corn, grain
+نمک زدن: corn, salify
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word45" class="word-container">
+    <div class="word-title" onclick="toggleContent('word45')"><span class="toggle">></span> craft</div>
+    <button class="mark-read-button" onclick="togglePosition('word45')">mark</button>
+    <div class="content" onclick="toggleContent('word45')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+craft
+---------
+مهارت
+
+=========
+<gray>0_0: Translations of</gray> craft
+<pos><b># n.</b></pos>
+مهارت: skill, proficiency, craft, dexterity, ingenuity, workmanship
+پیشه وری: craft
+هنر: art, craft, forte, accomplishment, artifice, mystery
+صنعت: industry, craft, art, mystery
+پیشه: craft, occupation, profession, trade, calling, vocation
+نیرنگ: trick, trickery, deception, ruse, craft, artifice
+حیله: gimmick, trick, cunning, deception, deceit, craft
+<pos><b># v.</b></pos>
+ساختن: build, make, create, construct, manufacture, craft
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word46" class="word-container">
+    <div class="word-title" onclick="toggleContent('word46')"><span class="toggle">></span> crew</div>
+    <button class="mark-read-button" onclick="togglePosition('word46')">mark</button>
+    <div class="content" onclick="toggleContent('word46')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+crew
+---------
+خدمه
+
+=========
+<gray>0_0: Translations of</gray> crew
+<pos><b># n.</b></pos>
+خدمه: crew, attendants, auxiliaries
+خدمه کشتی: crew
+کارکنان هواپیما و امثال ان: crew
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word47" class="word-container">
+    <div class="word-title" onclick="toggleContent('word47')"><span class="toggle">></span> cupboard</div>
+    <button class="mark-read-button" onclick="togglePosition('word47')">mark</button>
+    <div class="content" onclick="toggleContent('word47')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+cupboard
+---------
+کابینت
+
+=========
+<gray>0_0: Translations of</gray> cupboard
+<pos><b># n.</b></pos>
+گنجه: closet, cupboard, armoire, cuddy
+قفسه: rack, cabinet, encasement, cupboard, wardrobe
+گنجه ظروف غذا و غیره: cupboard
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word48" class="word-container">
+    <div class="word-title" onclick="toggleContent('word48')"><span class="toggle">></span> curtain</div>
+    <button class="mark-read-button" onclick="togglePosition('word48')">mark</button>
+    <div class="content" onclick="toggleContent('word48')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+curtain
+---------
+پرده
+
+=========
+<gray>0_0: Translations of</gray> curtain
+<pos><b># n.</b></pos>
+پرده: screen, curtain, membrane, veil, blind, pall
+حجاب: veil, curtain, shawl
+دیوار: wall, fence, bulkhead, curtain, enclosure, bulwark
+حاجب: curtain, chamberlain, doorkeeper, eyebrow, porter
+مانع: obstacle, barrier, hindrance, impediment, hurdle, curtain
+جدار: wall, sidewall, curtain, septum
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word49" class="word-container">
+    <div class="word-title" onclick="toggleContent('word49')"><span class="toggle">></span> custom</div>
+    <button class="mark-read-button" onclick="togglePosition('word49')">mark</button>
+    <div class="content" onclick="toggleContent('word49')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+custom
+---------
+سفارشی
+
+=========
+<gray>0_0: Translations of</gray> custom
+<pos><b># n.</b></pos>
+رسم: drawing, custom, tradition, way, ceremony, picture
+سنت: tradition, custom
+عرف: custom, tradition, practice, common law, praxis, civil law
+مرسوم: custom, tradition, wages
+عادت: habit, practice, custom, wont, tradition, addiction
+خوی: temper, temperament, nature, character, affection, custom
+حقوق گمرکی: custom
+برحسب عادت: custom
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word50" class="word-container">
+    <div class="word-title" onclick="toggleContent('word50')"><span class="toggle">></span> dare</div>
+    <button class="mark-read-button" onclick="togglePosition('word50')">mark</button>
+    <div class="content" onclick="toggleContent('word50')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+dare
+---------
+جرات
+
+=========
+<gray>0_0: Translations of</gray> dare
+<pos><b># n.</b></pos>
+شهامت: pluck, dare, daring, bounty, animosity
+<pos><b># v.</b></pos>
+جرات کردن: dare
+یارا بودن: dare
+مبادرت بکار دلیرانه کردن: dare
+بمبارزه طلبیدن: defy, challenge, dare, oppugn
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word51" class="word-container">
+    <div class="word-title" onclick="toggleContent('word51')"><span class="toggle">></span> dash</div>
+    <button class="mark-read-button" onclick="togglePosition('word51')">mark</button>
+    <div class="content" onclick="toggleContent('word51')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+dash
+---------
+خط تیره
+
+=========
+<gray>0_0: Translations of</gray> dash
+<pos><b># n.</b></pos>
+خط تیره: dash
+فاصله میان دو حرف: dash
+این علامت: bracket, dash
+پراکنده کردن: dash, interspersion
+رابطه: relation, connection, respect, relevance, nexus, dash
+حرارت: heat, fire, warmth, zeal, ardor, dash
+<pos><b># v.</b></pos>
+بسرعت رفتن: dash, flee, race
+بسرعت انجام دادن: dash
+بشدت زدن: dash, smash
+خود نمایی کردن: flaunt, show off, dash, grandstand, pose, posture
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word52" class="word-container">
+    <div class="word-title" onclick="toggleContent('word52')"><span class="toggle">></span> debate</div>
+    <button class="mark-read-button" onclick="togglePosition('word52')">mark</button>
+    <div class="content" onclick="toggleContent('word52')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+debate
+---------
+مناظره
+
+=========
+<gray>0_0: Translations of</gray> debate
+<pos><b># n.</b></pos>
+مناظره: debate, discussion, argument, disputation, dispute, argumentation
+مباحثه: debate, discussion, discourse, argument, controversy, contention
+مذاکره: negotiation, talk, discussion, debate, consultation, conference
+مذاکرات پارلمانی: debate
+بحی: discussion, quarrel, altercation, argument, argumentation, debate
+<pos><b># v.</b></pos>
+مناظره کردن: debate
+مطرح کردن: bring up, discuss, consider, moot, table, debate
+مباحثه کردن: debate, dispute, dissert
+سر و کله زدن: bicker, dispute, altercate, argue, argufy, debate
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word53" class="word-container">
+    <div class="word-title" onclick="toggleContent('word53')"><span class="toggle">></span> debt</div>
+    <button class="mark-read-button" onclick="togglePosition('word53')">mark</button>
+    <div class="content" onclick="toggleContent('word53')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+debt
+---------
+بدهی
+
+=========
+<gray>0_0: Translations of</gray> debt
+<pos><b># n.</b></pos>
+بدهی: debt, liability, debit, due
+قرض: debt, loan, trust
+وام: loan, debt, accommodation
+دین: religion, faith, debt, liability, amount due
+قصور: failure, negligence, default, shortcoming, laches, debt
+فام: color, credit, debt, colour
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word54" class="word-container">
+    <div class="word-title" onclick="toggleContent('word54')"><span class="toggle">></span> deck</div>
+    <button class="mark-read-button" onclick="togglePosition('word54')">mark</button>
+    <div class="content" onclick="toggleContent('word54')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+deck
+---------
+عرشه
+
+=========
+<gray>0_0: Translations of</gray> deck
+<pos><b># n.</b></pos>
+عرشه: deck, height
+دسته: category, class, handle, clique, gang, deck
+عرشه کشتی: deck, prow
+کف: floor, bottom, foam, bed, froth, deck
+دستینه: deck, holograph, longhand, signature
+یک دسته ورق: deck
+<pos><b># v.</b></pos>
+پوشاندن: cover, mask, conceal, coat, veil, deck
+اراستن: decorate, adorn, primp, blazon, apparel, deck
+زینت کردن: deck, decorate
+عرشهدار کردن: deck
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word55" class="word-container">
+    <div class="word-title" onclick="toggleContent('word55')"><span class="toggle">></span> declare</div>
+    <button class="mark-read-button" onclick="togglePosition('word55')">mark</button>
+    <div class="content" onclick="toggleContent('word55')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+declare
+---------
+اعلام
+
+=========
+<gray>0_0: Translations of</gray> declare
+<pos><b># v.</b></pos>
+اعلام کردن: declare, promulgate, notify, blazon, acclaim, enunciate
+اظهار کردن: declare, express, affirm, allude, froth, import
+گفتن: say, tell, utter, adduce, declare, tongue
+اظهار داشتن: express, declare, remark, say, state
+اعلان کردن: proclaim, announce, advertise, declare, give out
+شناساندن: declare
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word56" class="word-container">
+    <div class="word-title" onclick="toggleContent('word56')"><span class="toggle">></span> delicate</div>
+    <button class="mark-read-button" onclick="togglePosition('word56')">mark</button>
+    <div class="content" onclick="toggleContent('word56')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+delicate
+---------
+ظریف
+
+=========
+<gray>0_0: Translations of</gray> delicate
+<pos><b># a.</b></pos>
+ظریف: elegant, fine, delicate, graceful, gentle, jocular
+حساس: sensitive, susceptible, delicate, touchy, tender, sentient
+لطیف: subtle, delicate, soft, soft, fine, tender
+لاغر: lean, skinny, thin, slim, emaciated, delicate
+نازک بین: delicate
+باریک: thin, narrow, slender, tenuous, capillary, delicate
+خوش طعم: tasty, palatable, savory, dainty, delicious, delicate
+خوش ریخت: dainty, delicate, graceful, shapely, airy-fairy, clean-limbed
+خوش مزه: luscious, yummy, delicious, savory, tasty, delicate
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word57" class="word-container">
+    <div class="word-title" onclick="toggleContent('word57')"><span class="toggle">></span> delight</div>
+    <button class="mark-read-button" onclick="togglePosition('word57')">mark</button>
+    <div class="content" onclick="toggleContent('word57')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+delight
+---------
+لذت بسیار
+
+=========
+<gray>0_0: Translations of</gray> delight
+<pos><b># n.</b></pos>
+لذت: pleasure, delight, joy, enjoyment, gratification, gusto
+شوق: craze, delight, zeal, fervor, ardor, fervency
+خوشی: joy, pleasure, delight, fun, enjoyment, gladness
+سرور: joy, master, cheerfulness, chief, delight, prince
+حیرت: perplexity, astonishment, wonder, amazement, surprise, delight
+طرب: cheerfulness, joviality, mirth, jollification, joy, delight
+<pos><b># v.</b></pos>
+لذت دادن: delight, gratify
+دلشاد کردن: delight
+محظوظ کردن: delight, overjoy
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word58" class="word-container">
+    <div class="word-title" onclick="toggleContent('word58')"><span class="toggle">></span> depart</div>
+    <button class="mark-read-button" onclick="togglePosition('word58')">mark</button>
+    <div class="content" onclick="toggleContent('word58')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+depart
+---------
+رفتن
+
+=========
+<gray>0_0: Translations of</gray> depart
+<pos><b># v.</b></pos>
+حرکت کردن: move, whirl, waggle, depart, ambulate, proceed
+راهی شدن: go, depart
+روانه شدن: depart
+رخت بر بستن: decamp, depart
+عازم شدن: set off, set forth, shove off, pull out, be off, depart
+عزیمت کردن: depart, leave, resolve, start
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word59" class="word-container">
+    <div class="word-title" onclick="toggleContent('word59')"><span class="toggle">></span> despair</div>
+    <button class="mark-read-button" onclick="togglePosition('word59')">mark</button>
+    <div class="content" onclick="toggleContent('word59')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+despair
+---------
+ناامیدی
+
+=========
+<gray>0_0: Translations of</gray> despair
+<pos><b># n.</b></pos>
+یاس: despair, disappointment, discouragement, letdown
+نومیدی: despair, desperation, disappointment
+فروماندگی: despair, desperate situation, fatigue, inability, poverty
+<pos><b># v.</b></pos>
+مایوس شدن: despair, despond
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word60" class="word-container">
+    <div class="word-title" onclick="toggleContent('word60')"><span class="toggle">></span> devote</div>
+    <button class="mark-read-button" onclick="togglePosition('word60')">mark</button>
+    <div class="content" onclick="toggleContent('word60')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+devote
+---------
+اختصاص
+
+=========
+<gray>0_0: Translations of</gray> devote
+<pos><b># v.</b></pos>
+اختصاص دادن: assign, allocate, devote, appropriate, earmark, dedicate
+فدا کردن: sacrifice, devote, immolate, offer
+وقف کردن: bequeath, endow, dedicate, amortise, amortize, devote
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word61" class="word-container">
+    <div class="word-title" onclick="toggleContent('word61')"><span class="toggle">></span> dine</div>
+    <button class="mark-read-button" onclick="togglePosition('word61')">mark</button>
+    <div class="content" onclick="toggleContent('word61')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+dine
+---------
+شام خوردن
+
+=========
+<gray>0_0: Translations of</gray> dine
+<pos><b># v.</b></pos>
+ناهار خوردن: dine, lunch, tiffin
+شام خوردن: dine, sup
+شام دادن: dine, sup
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word62" class="word-container">
+    <div class="word-title" onclick="toggleContent('word62')"><span class="toggle">></span> disgust</div>
+    <button class="mark-read-button" onclick="togglePosition('word62')">mark</button>
+    <div class="content" onclick="toggleContent('word62')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+disgust
+---------
+انزجار
+
+=========
+<gray>0_0: Translations of</gray> disgust
+<pos><b># n.</b></pos>
+انزجار: disgust, antipathy, abhorrence, nausea, phobia, pique
+نفرت: hatred, hate, disgust, aversion, loathing, abomination
+تنفر: hatred, hate, disgust, distaste, abhorrence, loathing
+بیزاری: aversion, distaste, disgust, hatred, weariness, abomination
+بی میلی: reluctance, dismay, distaste, disinclination, loathing, disgust
+<pos><b># v.</b></pos>
+بیزار کردن: avert, disgust, disincline, loathe, repel, weary
+متنفر کردن: disgust
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word63" class="word-container">
+    <div class="word-title" onclick="toggleContent('word63')"><span class="toggle">></span> distaste</div>
+    <button class="mark-read-button" onclick="togglePosition('word63')">mark</button>
+    <div class="content" onclick="toggleContent('word63')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> es <gray>To</gray> fa
+distaste
+---------
+تو فاصله گرفتی
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word64" class="word-container">
+    <div class="word-title" onclick="toggleContent('word64')"><span class="toggle">></span> dormitory</div>
+    <button class="mark-read-button" onclick="togglePosition('word64')">mark</button>
+    <div class="content" onclick="toggleContent('word64')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+dormitory
+---------
+خوابگاه
+
+=========
+<gray>0_0: Translations of</gray> dormitory
+<pos><b># n.</b></pos>
+خوابگاه: dormitory, dorm, bedroom, bed, bedchamber, cubicle
+شبانه روزی: hostel, hostelry, dormitory
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word65" class="word-container">
+    <div class="word-title" onclick="toggleContent('word65')"><span class="toggle">></span> downtown</div>
+    <button class="mark-read-button" onclick="togglePosition('word65')">mark</button>
+    <div class="content" onclick="toggleContent('word65')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+downtown
+---------
+مرکز شهر
+
+=========
+<gray>0_0: Translations of</gray> downtown
+<pos><b># n.</b></pos>
+قسمت مرکزی شهر: downtown
+مرکز تجارت شهر: downtown
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word66" class="word-container">
+    <div class="word-title" onclick="toggleContent('word66')"><span class="toggle">></span> driveway</div>
+    <button class="mark-read-button" onclick="togglePosition('word66')">mark</button>
+    <div class="content" onclick="toggleContent('word66')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+driveway
+---------
+راهرو
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word67" class="word-container">
+    <div class="word-title" onclick="toggleContent('word67')"><span class="toggle">></span> duke</div>
+    <button class="mark-read-button" onclick="togglePosition('word67')">mark</button>
+    <div class="content" onclick="toggleContent('word67')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+duke
+---------
+دوک
+
+=========
+<gray>0_0: Translations of</gray> duke
+<pos><b># n.</b></pos>
+دوک: spindle, duke
+لقب موروثی اعیان انگلیس: duke
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word68" class="word-container">
+    <div class="word-title" onclick="toggleContent('word68')"><span class="toggle">></span> dull</div>
+    <button class="mark-read-button" onclick="togglePosition('word68')">mark</button>
+    <div class="content" onclick="toggleContent('word68')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+dull
+---------
+کدر
+
+=========
+<gray>0_0: Translations of</gray> dull
+<pos><b># a.</b></pos>
+کند: slow, sluggish, blunt, dull, tardy, lagging
+کودن: dull, dimwitted, slow, unintelligent, backward, lumpish
+راکد: stagnant, still, static, inert, dull, immovable
+احمق: stupid, foolish, silly, frivolous, dopey, dull
+گرفته: solemn, gruff, eerie, hoarse, dull, muzzy
+<pos><b># v.</b></pos>
+کند کردن: slacken, blunt, sheathe, decelerate, clog, dull
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word69" class="word-container">
+    <div class="word-title" onclick="toggleContent('word69')"><span class="toggle">></span> dust</div>
+    <button class="mark-read-button" onclick="togglePosition('word69')">mark</button>
+    <div class="content" onclick="toggleContent('word69')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+dust
+---------
+گرد و خاک
+
+=========
+<gray>0_0: Translations of</gray> dust
+<pos><b># n.</b></pos>
+غبار: dust, mist, nebulosity
+گرد و خاک: dust
+خاک: soil, territory, dirt, ground, dust, land
+خاکه: dust, powder
+ذره: particle, bit, whit, speck, grain, dust
+تراب: dust
+<pos><b># v.</b></pos>
+پاشیدن: spray, sprinkle, pour, infuse, sparge, dust
+گردگیری کردن: dust
+گرد گرفتن از: dust
+ریختن: shed, pour, infuse, cast, splash, dust
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word70" class="word-container">
+    <div class="word-title" onclick="toggleContent('word70')"><span class="toggle">></span> eager</div>
+    <button class="mark-read-button" onclick="togglePosition('word70')">mark</button>
+    <div class="content" onclick="toggleContent('word70')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+eager
+---------
+مشتاق
+
+=========
+<gray>0_0: Translations of</gray> eager
+<pos><b># a.</b></pos>
+مشتاق: eager, keen, enthusiastic, aspiring, avid, willing
+حریص: greedy, voracious, eager, avaricious, hungry, avid
+ترد و شکننده: eager
+پر از اشتیاق: eager
+پر اشتیاق: eager
+پر هوس: all absorbing, eager
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word71" class="word-container">
+    <div class="word-title" onclick="toggleContent('word71')"><span class="toggle">></span> embarrass</div>
+    <button class="mark-read-button" onclick="togglePosition('word71')">mark</button>
+    <div class="content" onclick="toggleContent('word71')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+embarrass
+---------
+شرم آور
+
+=========
+<gray>0_0: Translations of</gray> embarrass
+<pos><b># v.</b></pos>
+دست پاچه کردن: overwhelm, baffle, fluster, confuse, abash, embarrass
+براشفتن: embarrass, excite, ruffle
+خجالت دادن: shame, abash, embarrass, put to shame
+شرمسار شدن: embarrass
+ژولیده کردن: bemuse, confuse, daze, dishevel, embarrass, ruffle
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word72" class="word-container">
+    <div class="word-title" onclick="toggleContent('word72')"><span class="toggle">></span> engage</div>
+    <button class="mark-read-button" onclick="togglePosition('word72')">mark</button>
+    <div class="content" onclick="toggleContent('word72')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+engage
+---------
+مشغول کردن
+
+=========
+<gray>0_0: Translations of</gray> engage
+<pos><b># v.</b></pos>
+مشغول کردن: engage, busy, amuse, employ, entertain, occupy
+متعهد کردن: engage, federate
+گرفتن: take, catch, grab, capture, obtain, engage
+استخدام کردن: hire, employ, engage
+بکار گماشتن: employ, engage
+نامزد کردن: nominate, betroth, designate, engage, espouse, trothplight
+از پیش سفارش دادن: bespeak, engage
+درهم انداختن: engage
+گیر دادن: engage
+گرو گذاشتن: pledge, gage, gauge, pawn, mortgage, engage
+گرو دادن: engage
+قول دادن: promise, engage, undertake
+نامزد گرفتن: engage
+عهد کردن: engage, guarantee, oath, pledge, promise, swear
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word73" class="word-container">
+    <div class="word-title" onclick="toggleContent('word73')"><span class="toggle">></span> envelope</div>
+    <button class="mark-read-button" onclick="togglePosition('word73')">mark</button>
+    <div class="content" onclick="toggleContent('word73')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+envelope
+---------
+پاكت نامه
+
+=========
+<gray>0_0: Translations of</gray> envelope
+<pos><b># n.</b></pos>
+پاکت: envelope, pocket, cover
+پوشش: cover, coverage, envelopment, coating, covering, envelope
+پاکت نامه: envelope
+لفاف: wrapping, wrapper, sheeting, envelope, cover, filling
+جام: cup, Grail, goblet, bowl, chalice, envelope
+حلقهء گلبرگ: envelope
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word74" class="word-container">
+    <div class="word-title" onclick="toggleContent('word74')"><span class="toggle">></span> expense</div>
+    <button class="mark-read-button" onclick="togglePosition('word74')">mark</button>
+    <div class="content" onclick="toggleContent('word74')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+expense
+---------
+هزینه
+
+=========
+<gray>0_0: Translations of</gray> expense
+<pos><b># n.</b></pos>
+هزینه: cost, expense, expenditure, charge, outlay, toll
+خرج: cost, expense, charge, expenditure, outlay, input
+مصرف: consumption, use, expenditure, utilization, waster, expense
+بر امد: consequence, expenditure, expense, issue, outcome, result
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word75" class="word-container">
+    <div class="word-title" onclick="toggleContent('word75')"><span class="toggle">></span> expose</div>
+    <button class="mark-read-button" onclick="togglePosition('word75')">mark</button>
+    <div class="content" onclick="toggleContent('word75')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+expose
+---------
+در معرض گذاشتن
+
+=========
+<gray>0_0: Translations of</gray> expose
+<pos><b># v.</b></pos>
+در معرض گذاشتن: expose, subject
+افشاء کردن: impart, expose, divulge
+نمایش دادن: display, represent, exhibit, depict, perform, expose
+بیپناه گذاشتن: expose
+بی حفاظ گذاردن: expose
+ظاهر ساختن: reveal, expose, lay out, manifest
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word76" class="word-container">
+    <div class="word-title" onclick="toggleContent('word76')"><span class="toggle">></span> fare</div>
+    <button class="mark-read-button" onclick="togglePosition('word76')">mark</button>
+    <div class="content" onclick="toggleContent('word76')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+fare
+---------
+کرایه
+
+=========
+<gray>0_0: Translations of</gray> fare
+<pos><b># n.</b></pos>
+کرایه: rent, hire, freight, fare, lease, freightage
+مسافر: passenger, traveler, lodger, tripper, pilgrim, fare
+خوراک: feed, food, meat, cuisine, dish, fare
+کرایه مسافر: fare
+مسافر کرایهای: fare
+<pos><b># v.</b></pos>
+گذراندن: pass, survive, avert, while, fare, outwear
+گذران کردن: fare, get on, subsist
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word77" class="word-container">
+    <div class="word-title" onclick="toggleContent('word77')"><span class="toggle">></span> fashionable</div>
+    <button class="mark-read-button" onclick="togglePosition('word77')">mark</button>
+    <div class="content" onclick="toggleContent('word77')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+fashionable
+---------
+مد روز
+
+=========
+<gray>0_0: Translations of</gray> fashionable
+<pos><b># a.</b></pos>
+مد روز: fashionable, voguish
+شیک: stylish, fashionable, chic, finicky, smart, dapper
+شیک و مد: posh, fashionable, elegant
+متداول: common, popular, usual, current, prevalent, fashionable
+مطابق مد روز: posh, fashionable, stylish, elegant, new-fashioned
+خوش لباس: fashionable, dressed in good taste, dressed with elegance, elegant in dress, gash, well-dressed
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word78" class="word-container">
+    <div class="word-title" onclick="toggleContent('word78')"><span class="toggle">></span> forecast</div>
+    <button class="mark-read-button" onclick="togglePosition('word78')">mark</button>
+    <div class="content" onclick="toggleContent('word78')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+forecast
+---------
+پیش بینی
+
+=========
+<gray>0_0: Translations of</gray> forecast
+<pos><b># n.</b></pos>
+پیش بینی: forecast, anticipation, foresight, prognosis, prospect, prognoses
+پیش بینی وضع وا یا حوادی: forecast
+<pos><b># v.</b></pos>
+پیش بینی کردن: foretaste, dope, anticipate, prognosticate, augur, forecast
+طالع دیدن: forecast, foretell, soothsay, fortune-tell
+از پیش اگاهی دادن یا حدی زدن: forecast
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word79" class="word-container">
+    <div class="word-title" onclick="toggleContent('word79')"><span class="toggle">></span> former</div>
+    <button class="mark-read-button" onclick="togglePosition('word79')">mark</button>
+    <div class="content" onclick="toggleContent('word79')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+former
+---------
+سابق
+
+=========
+<gray>0_0: Translations of</gray> former
+<pos><b># a.</b></pos>
+سابق: former, old, past, preceding, antecedent, ci-devant
+پیشین: prior, a priori, former, previous, antecedent, olden
+قبلی: previous, prior, former, past, foregone, fore
+قبل: former
+سابقی: former, old, previous
+پیشی: former
+دارای انتای مربع: former
+جلوی: fore, anterior, forward, frontward, former, prior
+در جلو: former
+<pos><b># n.</b></pos>
+تشکیل دهنده: former, incorporator
+قالب گیر: former, founder
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word80" class="word-container">
+    <div class="word-title" onclick="toggleContent('word80')"><span class="toggle">></span> fragile</div>
+    <button class="mark-read-button" onclick="togglePosition('word80')">mark</button>
+    <div class="content" onclick="toggleContent('word80')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+fragile
+---------
+شکننده
+
+=========
+<gray>0_0: Translations of</gray> fragile
+<pos><b># a.</b></pos>
+شکننده: fragile, brittle, frangible, friable, frail, refringent
+ضعیف: weak, faint, weakly, feeble, flagging, fragile
+شکستنی: fragile, breakable
+نازک: thin, fine, slim, tender, soft, fragile
+ترد: crisp, crispy, brittle, tender, frangible, fragile
+لطیف: subtle, delicate, soft, soft, fine, fragile
+زودشکن: brittle, fragile
+باریک: thin, narrow, slender, tenuous, capillary, fragile
+بی اساس: baseless, unfounded, groundless, idle, insubstantial, fragile
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word81" class="word-container">
+    <div class="word-title" onclick="toggleContent('word81')"><span class="toggle">></span> glide</div>
+    <button class="mark-read-button" onclick="togglePosition('word81')">mark</button>
+    <div class="content" onclick="toggleContent('word81')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+glide
+---------
+سر خوردن
+
+=========
+<gray>0_0: Translations of</gray> glide
+<pos><b># v.</b></pos>
+سر خوردن: glide, slide, flivver, be disappointed, be discouraged, be disillusioned
+سریدن: skid, slide, slither, coast, glide, slip
+اسان رفتن: glide
+نرم رفتن: glide
+پرواز کردن بدوننیروی موتور: glide
+<pos><b># n.</b></pos>
+سر: head, end, tip, mystery, secret, glide
+سبک پریدن: glide
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word82" class="word-container">
+    <div class="word-title" onclick="toggleContent('word82')"><span class="toggle">></span> grain</div>
+    <button class="mark-read-button" onclick="togglePosition('word82')">mark</button>
+    <div class="content" onclick="toggleContent('word82')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+grain
+---------
+غلات
+
+=========
+<gray>0_0: Translations of</gray> grain
+<pos><b># n.</b></pos>
+دانه: grain, seed, kernel, granulation, bean, granule
+غله: grain, corn, cereal
+حبوبات: bean, grain, cereal, frijol
+ذره: particle, bit, whit, speck, grain, iota
+جو: atmosphere, barley, grain, flapdoodle, aerosphere
+دان: grain
+رگه: streak, vein, grain, midrib, thread, costa
+مشرب: disposition, mood, humor, grain, nature, watering place
+حبه: berry, grain, bean
+خرده: small, crumb, debris, filings, particle, grain
+چنگال: fork, claw, pitchfork, clutch, prong, grain
+تفاله حبوبات: grain
+رنگ: color, paint, dye, hue, tint, grain
+شاخه: branch, wing, arm, tributary, limb, grain
+حب: pill, berry, grain
+یک گندم معادل 0/0648 گرم: grain
+حالت: state, case, condition, situation, mood, grain
+<pos><b># v.</b></pos>
+دانه دانه کردن: granulate, corn, grain
+جوانه زدن: peep, germinate, sprout, bud, nip, grain
+دانه زدن: grain
+تراشیدن: shave, scrape, carve, trim, whittle, grain
+پشمکندن: grain
+متبلور شدن: grain, solidify
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word83" class="word-container">
+    <div class="word-title" onclick="toggleContent('word83')"><span class="toggle">></span> grand</div>
+    <button class="mark-read-button" onclick="togglePosition('word83')">mark</button>
+    <div class="content" onclick="toggleContent('word83')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+grand
+---------
+بزرگ
+
+=========
+<gray>0_0: Translations of</gray> grand
+<pos><b># a.</b></pos>
+بزرگ: great, large, big, major, mighty, grand
+عظیم: massive, great, enormous, tremendous, vast, grand
+عالی: excellent, great, high, supreme, superb, grand
+مجلل: luxurious, plush, sumptuous, palatial, gorgeous, grand
+والا: sublime, grand, haughty, prominent
+جدی: serious, earnest, solemn, drastic, rigid, grand
+مشهور: famous, popular, celebrated, reputable, famed, grand
+بسیار عالی با شکوه: grand
+با وقار: dignified, courtly, stately, ladylike, adult, grand
+<pos><b># n.</b></pos>
+هزار دلار: grand
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word84" class="word-container">
+    <div class="word-title" onclick="toggleContent('word84')"><span class="toggle">></span> grant</div>
+    <button class="mark-read-button" onclick="togglePosition('word84')">mark</button>
+    <div class="content" onclick="toggleContent('word84')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+grant
+---------
+اعطا کردن
+
+=========
+<gray>0_0: Translations of</gray> grant
+<pos><b># n.</b></pos>
+عطا: grant, gift, granting, donation, present
+کمک هزینه تحصیلی: fellowship, grant
+امتیاز: score, concession, privilege, distinction, franchising, grant
+اهداء: donation, dedication, grant, present
+بخشش: forgiveness, bounty, gift, mercy, grant, pardon
+اجازه واگذاری رسمی: grant
+حقوق بگیر: annuitant, grant
+<pos><b># v.</b></pos>
+دادن: give, give, grant, admit, impute, render
+اعطا کردن: grant, award, vest, vouchsafe, patent
+عطاء کردن: bestow, confer, give, grant
+بخشیدن: give, forgive, donate, remit, give away, grant
+تصدیق کردن: acknowledge, affirm, authenticate, establish, admit, grant
+مسلم گرفتن: grant
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word85" class="word-container">
+    <div class="word-title" onclick="toggleContent('word85')"><span class="toggle">></span> gulf</div>
+    <button class="mark-read-button" onclick="togglePosition('word85')">mark</button>
+    <div class="content" onclick="toggleContent('word85')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+gulf
+---------
+خلیج
+
+=========
+<gray>0_0: Translations of</gray> gulf
+<pos><b># n.</b></pos>
+خلیج: gulf, loch
+گرداب: vortex, whirlpool, tourbillon, gulf, waterspout
+جدایی: separation, divorce, segregation, breakaway, rupture, gulf
+خور: estuary, cove, bay, firth, gulf, inlet
+هر چیز بلعنده و فرو برنده: gulf
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word86" class="word-container">
+    <div class="word-title" onclick="toggleContent('word86')"><span class="toggle">></span> handicap</div>
+    <button class="mark-read-button" onclick="togglePosition('word86')">mark</button>
+    <div class="content" onclick="toggleContent('word86')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+handicap
+---------
+معلول
+
+=========
+<gray>0_0: Translations of</gray> handicap
+<pos><b># n.</b></pos>
+نقص: defect, deficiency, handicap, fault, imperfection, weakness
+مانع: obstacle, barrier, hindrance, impediment, hurdle, handicap
+اوانس: handicap
+اشکال: bug, difficulty, drawback, disadvantage, impediment, handicap
+امتیاز به طرف ضعیف در بازی: handicap
+<pos><b># v.</b></pos>
+امتیاز دادن: handicap
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word87" class="word-container">
+    <div class="word-title" onclick="toggleContent('word87')"><span class="toggle">></span> honor</div>
+    <button class="mark-read-button" onclick="togglePosition('word87')">mark</button>
+    <div class="content" onclick="toggleContent('word87')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+honor
+---------
+افتخار و احترام
+
+=========
+<gray>0_0: Translations of</gray> honor
+<pos><b># n.</b></pos>
+افتخار: pride, glory, honor, attribute, honour
+احترام: respect, honor, regard, tribute, reverence, respectability
+شرف: honor, honour
+شرافت: honor, gentility, honour
+عزت: esteem, honor, glory, respect, honour
+ناموس: honor, honour
+غیرت: honor, zeal, ardor, fervor, enthusiasm, mettle
+حضرت: Holiness, Excellency, majesty, honor, sainthood, honour
+جناب: Excellency, honor, honour
+فخر: pride, glory, honor, honour
+خوشنامی: reputation, honor, credit, name, spur, authority
+نجابت: decency, nobility, chastity, gentility, honor, gentilesse
+تشریفات امتیازویژه: honor, honour
+اب رو: honor, brow, canal, credit, effluent, eyebrow
+برو: honor, dignity, honour
+<pos><b># v.</b></pos>
+مفتخر کردن: honor, honour
+احترام کردن به: honor, honour
+محترم شمردن: honor, esteem, honour
+امتیاز تحصیلی اوردن: honor, honour
+شاگرد اول شدن: honor, honour
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word88" class="word-container">
+    <div class="word-title" onclick="toggleContent('word88')"><span class="toggle">></span> hop</div>
+    <button class="mark-read-button" onclick="togglePosition('word88')">mark</button>
+    <div class="content" onclick="toggleContent('word88')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+hop
+---------
+هاپ
+
+=========
+<gray>0_0: Translations of</gray> hop
+<pos><b># n.</b></pos>
+رازک: hop
+ابجو: beer, ale, gill, porter, hop
+افیون: opium, fix, hop
+طفره: subterfuge, evasion, avoidance, runaround, elusion, hop
+<pos><b># v.</b></pos>
+روی یک پا جستن: hop, hop along
+رازک بار اوردن: hop
+لی لی کردن: hop, hip, skip, spring
+جست وخیز کوچک کردن: hop
+رقصیدن: dance, ball, caper, hoof, hop, lope
+پرواز دادن: fly, hop
+لنگان لنگان راه رفتن: hop
+پلکیدن: hang around, hop, hover, scratch along
+خمیدن: bend, bow, cripple, decline, halt, hop
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word89" class="word-container">
+    <div class="word-title" onclick="toggleContent('word89')"><span class="toggle">></span> household</div>
+    <button class="mark-read-button" onclick="togglePosition('word89')">mark</button>
+    <div class="content" onclick="toggleContent('word89')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+household
+---------
+خانواده
+
+=========
+<gray>0_0: Translations of</gray> household
+<pos><b># a.</b></pos>
+خانگی: domestic, household, homemade, indoor, homebred, homelike
+<pos><b># n.</b></pos>
+خانواده: family, household, clan, ilk, dynasty, tribe
+خاندان: family, dynasty, clan, household, gens
+اهل بیت: inmate, household, house
+اهل خانه: household, house
+صمیمی: household
+مستخدمین خانه: household
+خانمان: housewares, household
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word90" class="word-container">
+    <div class="word-title" onclick="toggleContent('word90')"><span class="toggle">></span> hurricane</div>
+    <button class="mark-read-button" onclick="togglePosition('word90')">mark</button>
+    <div class="content" onclick="toggleContent('word90')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+hurricane
+---------
+طوفان
+
+=========
+<gray>0_0: Translations of</gray> hurricane
+<pos><b># n.</b></pos>
+طوفان: storm, flood, hurricane, typhoon, deluge, gale
+گردباد: whirlwind, tornado, cyclone, typhoon, hurricane, twister
+تندباد: hurricane, tempest
+طوفان شدید: hurricane
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word91" class="word-container">
+    <div class="word-title" onclick="toggleContent('word91')"><span class="toggle">></span> imply</div>
+    <button class="mark-read-button" onclick="togglePosition('word91')">mark</button>
+    <div class="content" onclick="toggleContent('word91')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+imply
+---------
+دلالت
+
+=========
+<gray>0_0: Translations of</gray> imply
+<pos><b># v.</b></pos>
+اشاره کردن: point, nudge, insinuate, mention, imply, allude
+دلالت ضمنی کردن بر: connote, imply
+اشاره داشتن بر: imply
+رساندن: convey, supply, transmit, extend, give, imply
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word92" class="word-container">
+    <div class="word-title" onclick="toggleContent('word92')"><span class="toggle">></span> impression</div>
+    <button class="mark-read-button" onclick="togglePosition('word92')">mark</button>
+    <div class="content" onclick="toggleContent('word92')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+impression
+---------
+احساس؛ عقیده؛ گمان
+
+=========
+<gray>0_0: Translations of</gray> impression
+<pos><b># n.</b></pos>
+احساس: feeling, sense, sentiment, sensation, impression, perception
+تاثیر: influence, impression, efficacy, affection, action, influx
+اثر: effect, result, efficacy, affect, relic, impression
+گمان: doubt, thought, guess, opinion, conjecture, impression
+چاپ: print, printing, edition, press, impression, stamp
+خاطره: memory, recollection, reminiscence, memoir, impression, thought
+عقیده: opinion, belief, view, notion, thought, impression
+ادراک: perception, understanding, savvy, conception, cognition, impression
+خیال: imagination, phantom, illusion, thought, fiction, impression
+نشان گذاری: notation, impression, mark sensing, punctuation
+جای مهر: impression
+خاطر: mind, memory, thought, remembrance, recollection, impression
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word93" class="word-container">
+    <div class="word-title" onclick="toggleContent('word93')"><span class="toggle">></span> ingredient</div>
+    <button class="mark-read-button" onclick="togglePosition('word93')">mark</button>
+    <div class="content" onclick="toggleContent('word93')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+ingredient
+---------
+جزء
+
+=========
+<gray>0_0: Translations of</gray> ingredient
+<pos><b># n.</b></pos>
+جزء: component, part, ingredient, member, detail, portion
+جزء ترکیبی: ingredient
+ذرات: ingredient
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word94" class="word-container">
+    <div class="word-title" onclick="toggleContent('word94')"><span class="toggle">></span> inn</div>
+    <button class="mark-read-button" onclick="togglePosition('word94')">mark</button>
+    <div class="content" onclick="toggleContent('word94')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+inn
+---------
+مسافرخانه
+
+=========
+<gray>0_0: Translations of</gray> inn
+<pos><b># n.</b></pos>
+مسافرخانه: inn, motel, hotel, lodging house
+کاروانسرا: inn, caravansary, caravan-serai, public house
+مهمانخانه: inn, hotel, public house, lodging house
+منزل: house, abode, accommodation, apartment, hearth, inn
+خان: khan, chamber, inn, caravansary, thane, caravan-serai
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word95" class="word-container">
+    <div class="word-title" onclick="toggleContent('word95')"><span class="toggle">></span> innocence</div>
+    <button class="mark-read-button" onclick="togglePosition('word95')">mark</button>
+    <div class="content" onclick="toggleContent('word95')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+innocence
+---------
+بی گناهی
+
+=========
+<gray>0_0: Translations of</gray> innocence
+<pos><b># n.</b></pos>
+برائت: innocence, acquittance, absolution, exculpation, purgation, compurgation
+بی گناهی: innocence, impeccability
+پاکی: purity, innocence, quittance, immaculacy, quietus
+بی تقصیری: innocence
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word96" class="word-container">
+    <div class="word-title" onclick="toggleContent('word96')"><span class="toggle">></span> innocent</div>
+    <button class="mark-read-button" onclick="togglePosition('word96')">mark</button>
+    <div class="content" onclick="toggleContent('word96')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+innocent
+---------
+بی گناه
+
+=========
+<gray>0_0: Translations of</gray> innocent
+<pos><b># a.</b></pos>
+بی گناه: innocent, sinless, guiltless, blameless, irreproachable, clean-handed
+معصوم: innocent, immaculate, sinless
+مبرا: innocent, free
+بی ضرر: harmless, innocuous, innocent, inoffensive
+بی تقصیر: blameless, innocent, faultless, clean-handed
+مقدس: holy, sacred, saint, sacrosanct, venerable, innocent
+منزه: pure, blameless, innocent, guiltless
+<pos><b># n.</b></pos>
+ادم بیگناه: innocent
+ادم ساده: goof, innocent, lamb
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word97" class="word-container">
+    <div class="word-title" onclick="toggleContent('word97')"><span class="toggle">></span> inspect</div>
+    <button class="mark-read-button" onclick="togglePosition('word97')">mark</button>
+    <div class="content" onclick="toggleContent('word97')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+inspect
+---------
+بازرسی
+
+=========
+<gray>0_0: Translations of</gray> inspect
+<pos><b># v.</b></pos>
+بازرسی کردن: examine, inspect, search, espy, proctor, sight
+رسیدگی کردن: consider, attend, check, inspect, investigate, investigate
+تفتیش کردن: inquire, inspect, investigate, revise
+سرکشی کردن: mutiny, disobey, inspect, rebel
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word98" class="word-container">
+    <div class="word-title" onclick="toggleContent('word98')"><span class="toggle">></span> intent</div>
+    <button class="mark-read-button" onclick="togglePosition('word98')">mark</button>
+    <div class="content" onclick="toggleContent('word98')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+intent
+---------
+قصد
+
+=========
+<gray>0_0: Translations of</gray> intent
+<pos><b># n.</b></pos>
+قصد: intention, intent, purpose, attempt, will, determination
+نیت: intent, purpose, will, idea, sentiment, resolution
+منظور: purpose, end, intention, aim, objective, intent
+مفاد: content, contents, context, substance, intent, meaning
+تصمیم: decision, intention, resolution, determination, resolve, intent
+عمد: purpose, intent, intention, premeditation, animus, aforethought
+مرام: ideology, platform, aim, principles, intent, program
+معنی: meaning, sense, significance, implication, signification, intent
+فکر: thought, idea, opinion, notion, concept, intent
+<pos><b># a.</b></pos>
+مصمم: determined, resolute, decided, resolved, intent, unflinching
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word99" class="word-container">
+    <div class="word-title" onclick="toggleContent('word99')"><span class="toggle">></span> interfere</div>
+    <button class="mark-read-button" onclick="togglePosition('word99')">mark</button>
+    <div class="content" onclick="toggleContent('word99')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+interfere
+---------
+مداخله کردن
+
+=========
+<gray>0_0: Translations of</gray> interfere
+<pos><b># v.</b></pos>
+دخالت کردن: interfere, participate, admix, intromit
+پا بمیان گذاردن: interfere, interpose, mediate
+مداخله کردن: intervene, interfere, interject, intermeddle, interpose, meddle
+پا میان گذاردن: interfere, intervene
+فضولی کردن: blab, meddle, kibitz, interfere, interlope, intermeddle
+پا گذاشتن: tread, enter, interfere, join
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word100" class="word-container">
+    <div class="word-title" onclick="toggleContent('word100')"><span class="toggle">></span> laughter</div>
+    <button class="mark-read-button" onclick="togglePosition('word100')">mark</button>
+    <div class="content" onclick="toggleContent('word100')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+laughter
+---------
+خنده
+
+=========
+<gray>0_0: Translations of</gray> laughter
+<pos><b># n.</b></pos>
+خنده: laughter, laugh, grin, sneer, fleer
+قاه قاه خنده: laughter, cachinnation, heehaw, horse laugh
+صدای خنده بلند: laughter
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word101" class="word-container">
+    <div class="word-title" onclick="toggleContent('word101')"><span class="toggle">></span> lend</div>
+    <button class="mark-read-button" onclick="togglePosition('word101')">mark</button>
+    <div class="content" onclick="toggleContent('word101')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+lend
+---------
+قرض دادن
+
+=========
+<gray>0_0: Translations of</gray> lend
+<pos><b># v.</b></pos>
+قرض دادن: lend
+وام دادن: lend
+عاریه دادن: lend, loan
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word102" class="word-container">
+    <div class="word-title" onclick="toggleContent('word102')"><span class="toggle">></span> log</div>
+    <button class="mark-read-button" onclick="togglePosition('word102')">mark</button>
+    <div class="content" onclick="toggleContent('word102')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+log
+---------
+ورود به سیستم
+
+=========
+<gray>0_0: Translations of</gray> log
+<pos><b># n.</b></pos>
+لگاریتم: log, logarithm, logarithm, mantissa
+کنده: log, block, chump, timber, clog, stub
+کارنامه: workbook, log, logarithm
+سرعت سنجکشتی: chip log, log
+صورت عملیات: log, logarithm
+سفرنامهکشتی: log
+گزارش سفرنامه کشتی: log, logarithm
+گزارش سفر هواپیما: log, logarithm
+قطعهای از درخت که اره نشده: log, logarithm
+<pos><b># v.</b></pos>
+ثبت کردن وقایع: log
+کندن کنده درخت: log, logarithm
+در سفرنامه وارد کردن: log, logarithm
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word103" class="word-container">
+    <div class="word-title" onclick="toggleContent('word103')"><span class="toggle">></span> marvel</div>
+    <button class="mark-read-button" onclick="togglePosition('word103')">mark</button>
+    <div class="content" onclick="toggleContent('word103')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+marvel
+---------
+شگفت زده کردن
+
+=========
+<gray>0_0: Translations of</gray> marvel
+<pos><b># n.</b></pos>
+تعجب: wonder, surprise, marvel, amaze, amazement, admiration
+شگفتی: astonishment, amazement, marvel, singularity, prodigy
+اعجاز: miracle, marvel, thaumaturgy
+معجزه: miracle, marvel, lollapalooza, wonderwork
+خرق عادت: marvel, miracle
+چیز شگفت: marvel
+<pos><b># v.</b></pos>
+حیرت زده شدن: marvel
+شگفت داشتن: be amazed, marvel, wonder
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word104" class="word-container">
+    <div class="word-title" onclick="toggleContent('word104')"><span class="toggle">></span> minister</div>
+    <button class="mark-read-button" onclick="togglePosition('word104')">mark</button>
+    <div class="content" onclick="toggleContent('word104')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+minister
+---------
+وزیر
+
+=========
+<gray>0_0: Translations of</gray> minister
+<pos><b># n.</b></pos>
+وزیر: minister, vizier, queen
+وزیر مختار: minister, minister plenipotentiary
+<pos><b># v.</b></pos>
+خدمت کردن: serve, minister, render service
+کشیش کمک کردن: minister
+بخش کردن: share, apportion, assign, divide, lot, minister
+عبادت کردن: worship, minister
+پرستاری کردن: attend, minister, nurse, tend
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word105" class="word-container">
+    <div class="word-title" onclick="toggleContent('word105')"><span class="toggle">></span> moderate</div>
+    <button class="mark-read-button" onclick="togglePosition('word105')">mark</button>
+    <div class="content" onclick="toggleContent('word105')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+moderate
+---------
+در حد متوسط
+
+=========
+<gray>0_0: Translations of</gray> moderate
+<pos><b># a.</b></pos>
+معتدل: temperate, moderate, modest, mild, medium, liberal
+میانه رو: moderate, frugal, sober, temperate
+متعادل: balanced, moderate, equal, equivalent, even
+ملایم: gentle, mild, soft, moderate, smooth, benign
+محدود: limited, finite, confined, narrow, bounded, moderate
+ارام: quiet, calm, peaceful, placid, gentle, moderate
+مناسب: suitable, appropriate, proper, convenient, adequate, moderate
+<pos><b># v.</b></pos>
+معتدل کردن: moderate, attenuate
+ملایم کردن: soften, moderate, sweeten, gentle, dulcify, temper
+اداره کردن: manage, manipulate, administer, run, operate, moderate
+تعدیل کردن: moderate, adjust, dampen, modify, modulate, regulate
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word106" class="word-container">
+    <div class="word-title" onclick="toggleContent('word106')"><span class="toggle">></span> monk</div>
+    <button class="mark-read-button" onclick="togglePosition('word106')">mark</button>
+    <div class="content" onclick="toggleContent('word106')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+monk
+---------
+راهب
+
+=========
+<gray>0_0: Translations of</gray> monk
+<pos><b># n.</b></pos>
+راهب: monk, cowl, hermit, anchoret, anchorite, ascetic
+تارک دنیا: hermit, religious, ascetic, monk
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word107" class="word-container">
+    <div class="word-title" onclick="toggleContent('word107')"><span class="toggle">></span> mud</div>
+    <button class="mark-read-button" onclick="togglePosition('word107')">mark</button>
+    <div class="content" onclick="toggleContent('word107')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+mud
+---------
+گل و لای
+
+=========
+<gray>0_0: Translations of</gray> mud
+<pos><b># n.</b></pos>
+گل: flower, mud, clay, blossom, silt, slob
+لجن: sludge, mud, silt, slush, slob, ooze
+افترا: libel, defamation, detraction, obloquy, accusal, mud
+<pos><b># v.</b></pos>
+گل الود کردن: puddle, bemire, lair, mud
+تیره کردن: darken, blur, obscure, dim, fog, mud
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word108" class="word-container">
+    <div class="word-title" onclick="toggleContent('word108')"><span class="toggle">></span> needle</div>
+    <button class="mark-read-button" onclick="togglePosition('word108')">mark</button>
+    <div class="content" onclick="toggleContent('word108')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+needle
+---------
+سوزن
+
+=========
+<gray>0_0: Translations of</gray> needle
+<pos><b># n.</b></pos>
+سوزن: needle, stylus, striker
+عقربه: needle, hand, pointer, gnomon
+سوزن سرنگ و گرامافون و غیره: needle
+<pos><b># v.</b></pos>
+سوزن دوزی کردن: needle
+با سوزن تزریق کردن: needle
+طعنه زدن: taunt, quip, needle, reproach
+اذیت کردن: offend, pester, hock, harass, hurt, needle
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word109" class="word-container">
+    <div class="word-title" onclick="toggleContent('word109')"><span class="toggle">></span> nevertheless</div>
+    <button class="mark-read-button" onclick="togglePosition('word109')">mark</button>
+    <div class="content" onclick="toggleContent('word109')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+nevertheless
+---------
+با این اوصاف
+
+=========
+<gray>0_0: Translations of</gray> nevertheless
+<pos><b># c.</b></pos>
+با این وجود: nevertheless
+معهذا: however, nevertheless
+با اینحال: nevertheless, nonetheless
+علیرغم: nevertheless
+<pos><b># a.</b></pos>
+با اینحال: yet, nevertheless, nonetheless
+هنوز: still, yet, as yet, however, nevertheless
+باز: again, nevertheless
+ضمنا: meantime, meanwhile, by the way, however, at the same time, nevertheless
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word110" class="word-container">
+    <div class="word-title" onclick="toggleContent('word110')"><span class="toggle">></span> oat</div>
+    <button class="mark-read-button" onclick="togglePosition('word110')">mark</button>
+    <div class="content" onclick="toggleContent('word110')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+oat
+---------
+جو دو سر
+
+=========
+<gray>0_0: Translations of</gray> oat
+<pos><b># n.</b></pos>
+جو دو سر: oat, wild oat
+یولاف: oat
+سلت های اسکاتلندی: oat
+جو صحرایی: oat
+شوفان: oat
+<pos><b># v.</b></pos>
+جو دادن: oat
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word111" class="word-container">
+    <div class="word-title" onclick="toggleContent('word111')"><span class="toggle">></span> occupation</div>
+    <button class="mark-read-button" onclick="togglePosition('word111')">mark</button>
+    <div class="content" onclick="toggleContent('word111')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+occupation
+---------
+اشتغال
+
+=========
+<gray>0_0: Translations of</gray> occupation
+<pos><b># n.</b></pos>
+اشغال: junk, occupation, garbage, rubbish, trash, occupancy
+شغل: job, occupation, work, profession, position, post
+اشتغال: engagement, occupation, office, busyness
+حرفه: profession, business, vocation, occupation, trade, pursuit
+تصرف: possession, seizure, occupation, seizing, tenure, occupancy
+پیشه: craft, occupation, profession, trade, calling, vocation
+سرگرمی: entertainment, fun, amusement, pastime, sport, occupation
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word112" class="word-container">
+    <div class="word-title" onclick="toggleContent('word112')"><span class="toggle">></span> opponent</div>
+    <button class="mark-read-button" onclick="togglePosition('word112')">mark</button>
+    <div class="content" onclick="toggleContent('word112')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+opponent
+---------
+حریف
+
+=========
+<gray>0_0: Translations of</gray> opponent
+<pos><b># n.</b></pos>
+حریف: opponent, adversary, rival, match, foe, competitor
+مخالف: dissident, dissident, opponent, anti, adversary, antagonist
+طرف مقابل: opponent, opposite party
+طرف: side, hand, party, direction, opponent, angle
+معارض: opponent
+منازع: opponent, enemy, litigant
+خصم: enemy, adversary, antagonist, foe, opponent, foeman
+ضد: opposite, hostile, antagonist, contrast, opponent, adversary
+عدو: oppositionist, assailant, enemy, adversary, antagonist, opponent
+<pos><b># a.</b></pos>
+ضد: opposite, contrary, hostile, antagonistic, opponent, adversary
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word113" class="word-container">
+    <div class="word-title" onclick="toggleContent('word113')"><span class="toggle">></span> ought</div>
+    <button class="mark-read-button" onclick="togglePosition('word113')">mark</button>
+    <div class="content" onclick="toggleContent('word113')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+ought
+---------
+باید
+
+=========
+<gray>0_0: Translations of</gray> ought
+<pos><b># v.</b></pos>
+باید: should, must, ought, shall, maun
+بایستی: shall, ought
+بایست: should, must, shall, ought
+باید و شاید: ought
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word114" class="word-container">
+    <div class="word-title" onclick="toggleContent('word114')"><span class="toggle">></span> out of spite</div>
+    <button class="mark-read-button" onclick="togglePosition('word114')">mark</button>
+    <div class="content" onclick="toggleContent('word114')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+out of spite
+---------
+از روی بغض
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word115" class="word-container">
+    <div class="word-title" onclick="toggleContent('word115')"><span class="toggle">></span> overwhelm</div>
+    <button class="mark-read-button" onclick="togglePosition('word115')">mark</button>
+    <div class="content" onclick="toggleContent('word115')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+overwhelm
+---------
+غرق کردن
+
+=========
+<gray>0_0: Translations of</gray> overwhelm
+<pos><b># v.</b></pos>
+پایمال کردن: overwhelm, trample, inculcate, devastate, suppress, override
+درهم شکستن: break down, overwhelm, smash, vanquish, crash, force
+منکوب کردن: subjugate, suppress, overwhelm, beat
+دست پاچه کردن: overwhelm, baffle, fluster, confuse, abash, incommode
+سراسر پوشاندن: overwhelm
+مستغرق دراندیشه شدن: overwhelm
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word116" class="word-container">
+    <div class="word-title" onclick="toggleContent('word116')"><span class="toggle">></span> owe</div>
+    <button class="mark-read-button" onclick="togglePosition('word116')">mark</button>
+    <div class="content" onclick="toggleContent('word116')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+owe
+---------
+مدیون
+
+=========
+<gray>0_0: Translations of</gray> owe
+<pos><b># v.</b></pos>
+بدهکار بودن: owe
+مدیون بودن: owe
+مرهون بودن: owe
+دارا بودن: have, contain, possess, own, enjoy, owe
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word117" class="word-container">
+    <div class="word-title" onclick="toggleContent('word117')"><span class="toggle">></span> pace</div>
+    <button class="mark-read-button" onclick="togglePosition('word117')">mark</button>
+    <div class="content" onclick="toggleContent('word117')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pace
+---------
+سرعت
+
+=========
+<gray>0_0: Translations of</gray> pace
+<pos><b># n.</b></pos>
+سرعت: speed, velocity, rapidity, rate, pace, speeding
+گام: step, pitch, stride, pace, scale, footstep
+قدم: step, foot, pace, stride, goer, footstep
+تندی: speed, velocity, rigor, pungency, celerity, pace
+شیوه: technique, style, method, pace, habitude, device
+<pos><b># v.</b></pos>
+گام زدن: walk, pace
+با قدم اهسته رفتن: pace
+قدم رو کردن: march, pace
+پیمودن: traverse, travel, wend, mete, measure, pace
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word118" class="word-container">
+    <div class="word-title" onclick="toggleContent('word118')"><span class="toggle">></span> pale</div>
+    <button class="mark-read-button" onclick="togglePosition('word118')">mark</button>
+    <div class="content" onclick="toggleContent('word118')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pale
+---------
+رنگ پریده
+
+=========
+<gray>0_0: Translations of</gray> pale
+<pos><b># a.</b></pos>
+رنگ پریده: pale, ghastly, wan, pallid, lurid, peaked
+کم رنگ: pale, inconspicuous, pallid, colorless, wan, lunar
+زرد: yellow, citrine, pale, canary, wan
+پژمرده: faded, withered, withering, droopy, pale, sere
+بی نور: pale, lightless, sunless, glassy, lackluster
+رنگ رفته: pale, pallid
+<pos><b># n.</b></pos>
+نرده: railing, fencing, balustrade, rail, parapet, pale
+حصار دفاعی: pale
+دفاع: defense, advocacy, pleading, vindication, apologia, pale
+قلمرو حدود: pale
+<pos><b># v.</b></pos>
+رنگ پریده شدن: pale
+رنگ رفتن: pale
+احاطه کردن: hem, corral, encompass, beset, environ, pale
+میله دار کردن: pale, rod, spoke
+در میان نرده محصور کردن: pale
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word119" class="word-container">
+    <div class="word-title" onclick="toggleContent('word119')"><span class="toggle">></span> perception</div>
+    <button class="mark-read-button" onclick="togglePosition('word119')">mark</button>
+    <div class="content" onclick="toggleContent('word119')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+perception
+---------
+ادراک
+
+=========
+<gray>0_0: Translations of</gray> perception
+<pos><b># n.</b></pos>
+ادراک: perception, understanding, savvy, conception, cognition, realization
+درک: perception, realization, apprehension, discernment, percept, uptake
+احساس: feeling, sense, sentiment, sensation, impression, perception
+دریافت: receipt, reception, perception, comprehension, discernment, inception
+مشاهده: observation, seeing, witnessing, perception
+مشاهده قوه ادراک: perception
+اگاهی: knowledge, awareness, consciousness, inkling, intelligence, perception
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word120" class="word-container">
+    <div class="word-title" onclick="toggleContent('word120')"><span class="toggle">></span> pile</div>
+    <button class="mark-read-button" onclick="togglePosition('word120')">mark</button>
+    <div class="content" onclick="toggleContent('word120')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pile
+---------
+توده
+
+=========
+<gray>0_0: Translations of</gray> pile
+<pos><b># n.</b></pos>
+ستون: column, pillar, pile, pole, shaft, jamb
+توده: mass, pile, lump, bulk, heap, stack
+کپه: pile, heap, mass, congeries, ruck
+پایه: base, grade, basis, foundation, stand, pile
+کومه: heap, rick, stack, pile, congeries, dollop
+مقدار زیاد: scads, potful, armful, lump, most, pile
+کرک: fluff, wool, pubes, down, lint, pile
+پارچه خزنما: pile
+ستون لنگرگاه: pile
+ستون پل: pile
+پرز قالی وغیره: pile
+<pos><b># v.</b></pos>
+توده کردن: amass, cumulate, heap, aggregate, hill, pile
+کومه کردن: stack, pile, rick
+اندوختن: accumulate, acquire, hive, lay in, salt away, pile
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word121" class="word-container">
+    <div class="word-title" onclick="toggleContent('word121')"><span class="toggle">></span> pine</div>
+    <button class="mark-read-button" onclick="togglePosition('word121')">mark</button>
+    <div class="content" onclick="toggleContent('word121')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pine
+---------
+کاج
+
+=========
+<gray>0_0: Translations of</gray> pine
+<pos><b># n.</b></pos>
+کاج: pine, pinon
+چوب کاج: pine
+نگرانی: worry, anxiety, solicitude, stew, pine, pother
+<pos><b># a.</b></pos>
+صنوبر: spruce, pine
+<pos><b># v.</b></pos>
+ضعیف شدن: weaken, attenuate, conk, pine, waste
+رنج و عذاب دادن: pine
+از غم و حسرت نحیف شدن: pine
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word122" class="word-container">
+    <div class="word-title" onclick="toggleContent('word122')"><span class="toggle">></span> plain</div>
+    <button class="mark-read-button" onclick="togglePosition('word122')">mark</button>
+    <div class="content" onclick="toggleContent('word122')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+plain
+---------
+جلگه
+
+=========
+<gray>0_0: Translations of</gray> plain
+<pos><b># n.</b></pos>
+دشت: plain, desert, field, flat, moor, pampas
+جلگه: plain, flat, plat, valley, flatland, champaign
+هامون: plain
+قاع: plain
+میدان یا محوطه جنگ: plain
+<pos><b># a.</b></pos>
+ساده: simple, easy, plain, naive, modest, ordinary
+صاف: smooth, clear, flat, plain, slick, clean
+واضح: obvious, clear, explicit, vivid, distinct, plain
+عادی: ordinary, normal, common, regular, usual, plain
+هموار: smooth, flat, plain, level, even, plane
+پهن: broad, wide, flat, flattened, large, plain
+رک و ساده: plain
+برابر: equal, equivalent, double, tantamount, parallel, plain
+اشکار: clear, manifest, obvious, plain, apparent, flagrant
+بد قیافه: gaunt, unfavorable, forbidding, plain, unfavourable
+سر راست: straightforward, straight, straightway, outspoken, plain, upstanding
+<pos><b># v.</b></pos>
+شکوه کردن: gripe, plain
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word123" class="word-container">
+    <div class="word-title" onclick="toggleContent('word123')"><span class="toggle">></span> pole</div>
+    <button class="mark-read-button" onclick="togglePosition('word123')">mark</button>
+    <div class="content" onclick="toggleContent('word123')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pole
+---------
+قطب
+
+=========
+<gray>0_0: Translations of</gray> pole
+<pos><b># n.</b></pos>
+قطب: pole, hub, axis, focus, gudgeon
+دیرک: pole, mast, pillar, lug
+ستون: column, pillar, pile, pole, shaft, jamb
+دسته بلند چیزی: pole
+تیر چراغ برق: pole
+خاده: neckcloth, broomstick, dog hook, fire hook, gaff, pole
+<pos><b># v.</b></pos>
+قطب دار کردن: pole
+تیر دار کردن: pole, stanchion
+با تیر یا دیرک محکم کردن: pole
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word124" class="word-container">
+    <div class="word-title" onclick="toggleContent('word124')"><span class="toggle">></span> portion</div>
+    <button class="mark-read-button" onclick="togglePosition('word124')">mark</button>
+    <div class="content" onclick="toggleContent('word124')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+portion
+---------
+بخش
+
+=========
+<gray>0_0: Translations of</gray> portion
+<pos><b># n.</b></pos>
+سهم: share, contribution, portion, stock, allotment, quota
+بخش: section, part, sector, department, segment, portion
+قسمت: section, portion, segment, department, chapter, division
+جزء: component, part, ingredient, member, detail, portion
+نصیب: portion, part
+بهره: interest, portion, share, lot
+قطعه: piece, segment, part, fragment, passage, portion
+تکه: piece, slice, patch, chunk, fragment, portion
+پاره: part, fragment, piece, shred, portion, bit
+شقه: half, part, portion
+برخه: part, fraction, portion
+اری: heritage, inheritance, legacy, legation, portion
+<pos><b># v.</b></pos>
+تسهیم کردن: share, portion, whack, whack up
+سهم بندی کردن: lot, portion
+بخشیدن: give, forgive, donate, remit, give away, portion
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word125" class="word-container">
+    <div class="word-title" onclick="toggleContent('word125')"><span class="toggle">></span> possess</div>
+    <button class="mark-read-button" onclick="togglePosition('word125')">mark</button>
+    <div class="content" onclick="toggleContent('word125')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+possess
+---------
+در اختیار داشتن
+
+=========
+<gray>0_0: Translations of</gray> possess
+<pos><b># v.</b></pos>
+داشتن: have, possess, own, bear, relieve
+دارا بودن: have, contain, possess, own, enjoy, encompass
+متصرف بودن: possess, tenant
+در تصرف داشتن: possess
+دارا شدن: possess
+متصرف شدن: possess
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word126" class="word-container">
+    <div class="word-title" onclick="toggleContent('word126')"><span class="toggle">></span> pot</div>
+    <button class="mark-read-button" onclick="togglePosition('word126')">mark</button>
+    <div class="content" onclick="toggleContent('word126')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pot
+---------
+گلدان
+
+=========
+<gray>0_0: Translations of</gray> pot
+<pos><b># n.</b></pos>
+گلدان: pot, vase, urn, jardiniere
+دیگ: pot, cauldron, furnace, caldron
+قابلمه: pot, saucepan, autoclave
+قوری: pot
+کتری: kettle, skillet, pot
+دیگچه: skillet, pot, kettle
+اب پاش: sprinkler, pot, spray
+ماری جوانا وسایرمواد مخدره: pot
+سبو: pitcher, crock, jar, pot, stoup
+هر چیز برجسته و دیگ مانند: pot
+<pos><b># v.</b></pos>
+در گلدان گذاشتن: pot
+در گلدان محفوظ داشتن: pot
+در دیگ پختن: pot
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word127" class="word-container">
+    <div class="word-title" onclick="toggleContent('word127')"><span class="toggle">></span> pour</div>
+    <button class="mark-read-button" onclick="togglePosition('word127')">mark</button>
+    <div class="content" onclick="toggleContent('word127')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pour
+---------
+ریختن
+
+=========
+<gray>0_0: Translations of</gray> pour
+<pos><b># v.</b></pos>
+ریختن: shed, pour, infuse, cast, splash, decant
+جاری شدن: gush, trill, pour, rill, stream, emanate
+پاشیدن: spray, sprinkle, pour, infuse, sparge, strew
+روان ساختن: pour
+افشاندن: spray, scatter, exude, besprinkle, bestrew, pour
+باریدن: rain, shower, pour
+<pos><b># n.</b></pos>
+ریزش: abscission, pour, infusion, inset, downfall, slide
+تراوش بوسیله ریزش: pour
+مقدار ریزپ چیزی: pour
+ریزش بلا انقطاع و مسلسل: pour
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word128" class="word-container">
+    <div class="word-title" onclick="toggleContent('word128')"><span class="toggle">></span> poverty</div>
+    <button class="mark-read-button" onclick="togglePosition('word128')">mark</button>
+    <div class="content" onclick="toggleContent('word128')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+poverty
+---------
+فقر
+
+=========
+<gray>0_0: Translations of</gray> poverty
+<pos><b># n.</b></pos>
+فقر: poverty, destitution, penury, indigence
+بینوایی: poverty, impoverishment
+خواری: ignominy, abasement, poverty, insult, abjection, abuse
+تهی دستی: misery, poverty, indigence
+کمیابی: scarcity, rarity, paucity, poverty, infrequency, famine
+پستی: baseness, meanness, inferiority, degradation, debasement, poverty
+فروماندگی: despair, desperate situation, fatigue, inability, poverty
+تندگستی: poverty
+بی پولی: poverty
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word129" class="word-container">
+    <div class="word-title" onclick="toggleContent('word129')"><span class="toggle">></span> preserve</div>
+    <button class="mark-read-button" onclick="togglePosition('word129')">mark</button>
+    <div class="content" onclick="toggleContent('word129')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+preserve
+---------
+حفظ
+
+=========
+<gray>0_0: Translations of</gray> preserve
+<pos><b># v.</b></pos>
+حفظ کردن: memorize, retain, preserve, keep, maintain, protect
+نگه داشتن: hold, maintain, retain, sustain, impound, preserve
+نگاه داشتن: keep, hold, retain, save, withhold, preserve
+باقی نگهداشتن: preserve
+<pos><b># n.</b></pos>
+شکارگاه: hunting ground, preserve
+قرق شکارگاه: preserve
+مربا: jam, confection, preserve
+کنسرو میوه: preserve
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word130" class="word-container">
+    <div class="word-title" onclick="toggleContent('word130')"><span class="toggle">></span> principal</div>
+    <button class="mark-read-button" onclick="togglePosition('word130')">mark</button>
+    <div class="content" onclick="toggleContent('word130')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+principal
+---------
+اصلی
+
+=========
+<gray>0_0: Translations of</gray> principal
+<pos><b># a.</b></pos>
+اصلی: main, original, principal, basic, primary, essential
+عمده: major, main, chief, leading, significant, principal
+مهم: important, significant, main, great, serious, principal
+<pos><b># n.</b></pos>
+مدیر: manager, director, administrator, principal, moderator, foreman
+مدیر مدرسه: principal, head master
+رئيس: head, director, chairman, president, boss, principal
+سرمایه اصلی: principal
+مجرم اصلی: principal
+سالار: chieftain, leader, chief, head, principal, don
+مایه: source, capital, funds, vaccine, whey, principal
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word131" class="word-container">
+    <div class="word-title" onclick="toggleContent('word131')"><span class="toggle">></span> proceed</div>
+    <button class="mark-read-button" onclick="togglePosition('word131')">mark</button>
+    <div class="content" onclick="toggleContent('word131')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+proceed
+---------
+ادامه دهید
+
+=========
+<gray>0_0: Translations of</gray> proceed
+<pos><b># v.</b></pos>
+اقدام کردن: proceed, launch
+رهسپار شدن: go, proceed, travel, leave
+پیش رفتن: go forward, jut, proceed, precess, advance, antecede
+حرکت کردن: move, whirl, waggle, depart, ambulate, proceed
+پرداختن به: proceed
+ناشی شدن از: derive, proceed, rise
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word132" class="word-container">
+    <div class="word-title" onclick="toggleContent('word132')"><span class="toggle">></span> pursue</div>
+    <button class="mark-read-button" onclick="togglePosition('word132')">mark</button>
+    <div class="content" onclick="toggleContent('word132')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+pursue
+---------
+دنبال کردن
+
+=========
+<gray>0_0: Translations of</gray> pursue
+<pos><b># v.</b></pos>
+دنبال کردن: pursue, follow, track, trace, chase, follow out
+تعقیب کردن: pursue, chase, follow, chevy, sue, chivvy
+اتخاذ کردن: adopt, pursue
+تعاقب کردن: pursue
+پیگرد کر دن: pursue
+پی گیری کردن: follow up, pursue
+تحت تعقیب قانونی قرار دادن: pursue
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word133" class="word-container">
+    <div class="word-title" onclick="toggleContent('word133')"><span class="toggle">></span> quit</div>
+    <button class="mark-read-button" onclick="togglePosition('word133')">mark</button>
+    <div class="content" onclick="toggleContent('word133')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+quit
+---------
+ترک کردن
+
+=========
+<gray>0_0: Translations of</gray> quit
+<pos><b># n.</b></pos>
+ترک: crack, quit, stop, Turk, abandonment, fracture
+رها سازی: triggering, emancipation, abandon, abandonment, dereliction, quit
+<pos><b># v.</b></pos>
+ول کردن: give up, quit, desert, discard, forsake, leave
+تسلیم شدن: surrender, give in, submit, capitulate, succumb, quit
+دست کشیدن از: knock off, discard, quit, leave, disaccustom, give over
+منصرف شدن: give up, quit, change one's mind
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word134" class="word-container">
+    <div class="word-title" onclick="toggleContent('word134')"><span class="toggle">></span> recall</div>
+    <button class="mark-read-button" onclick="togglePosition('word134')">mark</button>
+    <div class="content" onclick="toggleContent('word134')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+recall
+---------
+به خاطر آوردن
+
+=========
+<gray>0_0: Translations of</gray> recall
+<pos><b># v.</b></pos>
+فرا خواندن: recall, call, summon, evoke, draft, muster
+بخاطر آوردن: remember, recall, mind, recollect, reminisce, call up
+بیاد اوردن: recall, bethink, remind
+معزول کردن: eject, discharge, dismiss, recall
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word135" class="word-container">
+    <div class="word-title" onclick="toggleContent('word135')"><span class="toggle">></span> recipe</div>
+    <button class="mark-read-button" onclick="togglePosition('word135')">mark</button>
+    <div class="content" onclick="toggleContent('word135')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+recipe
+---------
+دستور آشپزی
+
+=========
+<gray>0_0: Translations of</gray> recipe
+<pos><b># n.</b></pos>
+دستور العمل: recipe, instruction, ground rule, address instruction
+دستور خوراک پزی: recipe
+خوراک دستور: recipe
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word136" class="word-container">
+    <div class="word-title" onclick="toggleContent('word136')"><span class="toggle">></span> reef</div>
+    <button class="mark-read-button" onclick="togglePosition('word136')">mark</button>
+    <div class="content" onclick="toggleContent('word136')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+reef
+---------
+تپه دریایی
+
+=========
+<gray>0_0: Translations of</gray> reef
+<pos><b># n.</b></pos>
+تپه دریایی: reef
+جزیره نما: reef
+<pos><b># v.</b></pos>
+پیچیدن و جمع کردن بادبان: reef
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word137" class="word-container">
+    <div class="word-title" onclick="toggleContent('word137')"><span class="toggle">></span> regard</div>
+    <button class="mark-read-button" onclick="togglePosition('word137')">mark</button>
+    <div class="content" onclick="toggleContent('word137')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+regard
+---------
+توجه
+
+=========
+<gray>0_0: Translations of</gray> regard
+<pos><b># n.</b></pos>
+توجه: attention, consideration, regard, care, notice, heed
+نظر: opinion, view, look, regard, viewpoint, sight
+احترام: respect, honor, regard, tribute, reverence, respectability
+باره: regard
+ملاحظه: consideration, regard, observation, remark, prudence, reservation
+رعایت: observance, observation, regard, heed
+بابت: regard, behalf, concern
+نگاه: look, glance, regard, gander, kenning
+سلام: greeting, salute, salutation, salaam, hail, regard
+مراعات: observance, consideration, regard, heed, assistance
+درود: greeting, salute, hail, salutation, compliment, regard
+<pos><b># v.</b></pos>
+نگریستن: look, regard, glance
+ملاحظه کردن: consider, remark, heed, note, notice, regard
+اعتناء کردن به: heed, mind, regard
+نگاه کردن: look up, look, see, eye, regard
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word138" class="word-container">
+    <div class="word-title" onclick="toggleContent('word138')"><span class="toggle">></span> reluctant</div>
+    <button class="mark-read-button" onclick="togglePosition('word138')">mark</button>
+    <div class="content" onclick="toggleContent('word138')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> la <gray>To</gray> fa
+reluctant
+---------
+آنها تردید می کنند
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word139" class="word-container">
+    <div class="word-title" onclick="toggleContent('word139')"><span class="toggle">></span> remark</div>
+    <button class="mark-read-button" onclick="togglePosition('word139')">mark</button>
+    <div class="content" onclick="toggleContent('word139')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+remark
+---------
+تذکر
+
+=========
+<gray>0_0: Translations of</gray> remark
+<pos><b># v.</b></pos>
+سخن گفتن: speak, talk, remark, say, discourse, converse
+ملاحظه کردن: consider, remark, heed, note, notice, observe
+اظهار داشتن: express, declare, remark, say, state
+اظهار نظریه دادن: remark
+<pos><b># n.</b></pos>
+اظهار: statement, declaration, say, saying, testimony, remark
+تبصره: note, footnote, remark
+تذکر: reminder, hint, notification, mention, remark, admonition
+ملاحظه: consideration, regard, observation, remark, prudence, reservation
+توجه: attention, consideration, regard, care, notice, remark
+بیان: expression, statement, explanation, presentation, interpretation, remark
+عرضه داشت: remark, declaration, memorial, petition, statement
+فرمایش: command, remark, order, word, wish
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word140" class="word-container">
+    <div class="word-title" onclick="toggleContent('word140')"><span class="toggle">></span> resemble</div>
+    <button class="mark-read-button" onclick="togglePosition('word140')">mark</button>
+    <div class="content" onclick="toggleContent('word140')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+resemble
+---------
+شبیه
+
+=========
+<gray>0_0: Translations of</gray> resemble
+<pos><b># v.</b></pos>
+شباهت داشتن: resemble
+مانستن: look like, be like, be similar to, resemble
+تشبیه کردن: analogize, resemble, simulate
+مانند بودن: resemble, simulate
+همانند کردن یا بودن: resemble
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word141" class="word-container">
+    <div class="word-title" onclick="toggleContent('word141')"><span class="toggle">></span> resort</div>
+    <button class="mark-read-button" onclick="togglePosition('word141')">mark</button>
+    <div class="content" onclick="toggleContent('word141')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+resort
+---------
+رفت و آمد مکرر
+
+=========
+<gray>0_0: Translations of</gray> resort
+<pos><b># n.</b></pos>
+رفت و آمد مکرر: resort
+مامن: resort, nook
+ملجا: refuge, resort
+میعادگاه: tryst, rendezvous, meeting place, resort, howff, stamping ground
+مفر: loophole, refuge, resort
+مراجعه: reference, referral, recourse, returning, resort, remarrying a divorced woman
+پناه گاه: awning, shelter, sanctuary, harbor, refuge, resort
+پاتوغ: port of call, hangout, flash house, haunt, howff, resort
+ملاقات مکرر: resort
+محل استراحت: lounge, resort
+<pos><b># v.</b></pos>
+متوسل شدن: resort
+دوباره دسته بندی کردن: resort
+متشبث شدن به: resort
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word142" class="word-container">
+    <div class="word-title" onclick="toggleContent('word142')"><span class="toggle">></span> rid</div>
+    <button class="mark-read-button" onclick="togglePosition('word142')">mark</button>
+    <div class="content" onclick="toggleContent('word142')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+rid
+---------
+خلاص شدن از شر
+
+=========
+<gray>0_0: Translations of</gray> rid
+<pos><b># v.</b></pos>
+رهانیدن از: rid
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word143" class="word-container">
+    <div class="word-title" onclick="toggleContent('word143')"><span class="toggle">></span> ritual</div>
+    <button class="mark-read-button" onclick="togglePosition('word143')">mark</button>
+    <div class="content" onclick="toggleContent('word143')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+ritual
+---------
+مراسم
+
+=========
+<gray>0_0: Translations of</gray> ritual
+<pos><b># n.</b></pos>
+تشریفات: formality, protocol, ritual, ceremonial, ceremony, service
+تشریفات مذهبی: ritual, rite
+ایین پرستش: ritual
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word144" class="word-container">
+    <div class="word-title" onclick="toggleContent('word144')"><span class="toggle">></span> roam</div>
+    <button class="mark-read-button" onclick="togglePosition('word144')">mark</button>
+    <div class="content" onclick="toggleContent('word144')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+roam
+---------
+پرسه زدن
+
+=========
+<gray>0_0: Translations of</gray> roam
+<pos><b># v.</b></pos>
+پرسه زدن: roam, prowl, saunter, prog, loaf, knock about
+گشتن: search, roam, trundle, go, goggle, grow
+سیر کردن: feed, satiate, sate, fill, revolve, roam
+گردیدن: revolve, roam, swirl
+<pos><b># n.</b></pos>
+غربت: roving, roam, foreign country
+سر گردانی: roam, straying, divagation, quandary, ramble, vagrancy
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word145" class="word-container">
+    <div class="word-title" onclick="toggleContent('word145')"><span class="toggle">></span> saw</div>
+    <button class="mark-read-button" onclick="togglePosition('word145')">mark</button>
+    <div class="content" onclick="toggleContent('word145')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+saw
+---------
+اره
+
+=========
+<gray>0_0: Translations of</gray> saw
+<pos><b># n.</b></pos>
+اره: saw
+لغت یا جمله ضربالمثل: saw
+امثال و حکم: adage, apothegm, saw
+هراسبابی شبیه اره: saw
+منشار: saw
+ضرب المثل: saying, proverb, adage, byword, gnome, saw
+مثال: example, instance, parable, exemplar, proverb, saw
+<pos><b># v.</b></pos>
+دید: saw
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word146" class="word-container">
+    <div class="word-title" onclick="toggleContent('word146')"><span class="toggle">></span> secure</div>
+    <button class="mark-read-button" onclick="togglePosition('word146')">mark</button>
+    <div class="content" onclick="toggleContent('word146')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+secure
+---------
+امن است
+
+=========
+<gray>0_0: Translations of</gray> secure
+<pos><b># a.</b></pos>
+امن: secure, safe, assured
+مطمئن: sure, safe, confident, secure, assured, persuaded
+ایمن: safe, secure
+محکم: sturdy, strong, firm, solid, tight, secure
+محفوظ: protected, preserved, safe, secure, guarded
+در امان: secure
+بی خطر: safe, benign, secure, sound
+استوار: firm, solid, consistent, stable, steadfast, secure
+<pos><b># v.</b></pos>
+حفظ کردن: memorize, retain, preserve, keep, maintain, secure
+تامین کردن: supply, secure, cover, safeguard
+ضامن دار کردن: secure
+محفوظ داشتن تامین کردن: secure
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word147" class="word-container">
+    <div class="word-title" onclick="toggleContent('word147')"><span class="toggle">></span> seek</div>
+    <button class="mark-read-button" onclick="togglePosition('word147')">mark</button>
+    <div class="content" onclick="toggleContent('word147')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+seek
+---------
+به دنبال
+
+=========
+<gray>0_0: Translations of</gray> seek
+<pos><b># v.</b></pos>
+طلبیدن: seek, request, summon, ask, invite, search
+جستجو کردن: search, seek, scour, look for, attempt, ransack
+طلب کردن: seek, ask, bag, demand, request, search
+جوییدن: seek
+پوییدن: run, scan, search, seek
+پیگردی کردن: explore, seek, track
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word148" class="word-container">
+    <div class="word-title" onclick="toggleContent('word148')"><span class="toggle">></span> settle</div>
+    <button class="mark-read-button" onclick="togglePosition('word148')">mark</button>
+    <div class="content" onclick="toggleContent('word148')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+settle
+---------
+حل کن
+
+=========
+<gray>0_0: Translations of</gray> settle
+<pos><b># v.</b></pos>
+ته نشین شدن: settle
+ماندن: stay, remain, be, stand, settle, subsist
+مستقر شدن: settle, set, fix
+تصفیه کردن: refine, clean up, filter, purge, settle, purify
+مقیم شدن: settle, reside
+مستقر ساختن: locate, settle
+مسکن دادن: domicile, lodge, settle
+مسکن گزیدن: bield, guest, inhabit, room, settle
+فرو نشستن: subside, be quenched, abate, founder, be quelled, settle
+جا دادن: accommodate, incorporate, house, embed, infix, settle
+مقیم کردن: garrison, settle
+ساکن کردن: denizen, lodge, settle
+واریز کردن: even, settle, square
+معین کردن: determine, ascertain, define, specify, designate, settle
+تصفیه حساب کردن: settle
+نشست کردن: extravasate, settle, sink, subside
+تسویه کردن: defray, compromise, liquidate, liquidize, pay off, settle
+فیصل دادن: decide, settle, solve
+<pos><b># n.</b></pos>
+واریز: settlement, settle
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word149" class="word-container">
+    <div class="word-title" onclick="toggleContent('word149')"><span class="toggle">></span> severe</div>
+    <button class="mark-read-button" onclick="togglePosition('word149')">mark</button>
+    <div class="content" onclick="toggleContent('word149')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+severe
+---------
+شدید
+
+=========
+<gray>0_0: Translations of</gray> severe
+<pos><b># a.</b></pos>
+شدید: severe, intense, violent, drastic, intensive, vigorous
+سخت: hard, difficult, tough, strict, rigid, severe
+سخت گیر: strict, intransigent, stern, exacting, squeamish, severe
+شاق: burdensome, onerous, severe, astringent, stark, tall
+خشک: dry, arid, withered, barren, waterless, severe
+عنیف: drastic, harsh, hideous, repugnant, severe
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word150" class="word-container">
+    <div class="word-title" onclick="toggleContent('word150')"><span class="toggle">></span> shiver</div>
+    <button class="mark-read-button" onclick="togglePosition('word150')">mark</button>
+    <div class="content" onclick="toggleContent('word150')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+shiver
+---------
+لرزیدن
+
+=========
+<gray>0_0: Translations of</gray> shiver
+<pos><b># n.</b></pos>
+لرز: chills, shiver, tremble, thrill, shake
+لرزه: tremble, quake, vibration, shiver, tremor, shudder
+خرده: small, crumb, debris, filings, particle, shiver
+ارتعاش: vibration, vibrancy, shake, quiver, tremble, shiver
+ریزه: detritus, midget, mote, particle, bit, shiver
+<pos><b># v.</b></pos>
+لرزیدن: shake, tremble, shudder, shiver, vibrate, throb
+از سرما لرزیدن: shiver, chitter
+لرزاندن: tremble, jar, flutter, quake, quaver, shiver
+خرد کردن: grind, minify, squelch, smash, abate, shiver
+مرتعش کردن: shudder, shiver, vibrate
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word151" class="word-container">
+    <div class="word-title" onclick="toggleContent('word151')"><span class="toggle">></span> shore</div>
+    <button class="mark-read-button" onclick="togglePosition('word151')">mark</button>
+    <div class="content" onclick="toggleContent('word151')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+shore
+---------
+ساحل
+
+=========
+<gray>0_0: Translations of</gray> shore
+<pos><b># n.</b></pos>
+ساحل: beach, coast, shore, bank, strand, brae
+کرانه: boundary, shore, littoral, strand, mete
+کنار دریا: beach, waterside, foreshore, shore, strand
+لب: lip, cheek, brink, bank, nucleus, shore
+<pos><b># v.</b></pos>
+ترساندن: scare, frighten, intimidate, terrorize, deter, shore
+بساحل رفتن: shore
+فرود امدن: come down, alight, descend, ground, land, shore
+پیاده شدن در ساحل: shore
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word152" class="word-container">
+    <div class="word-title" onclick="toggleContent('word152')"><span class="toggle">></span> shut</div>
+    <button class="mark-read-button" onclick="togglePosition('word152')">mark</button>
+    <div class="content" onclick="toggleContent('word152')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+shut
+---------
+بسته
+
+=========
+<gray>0_0: Translations of</gray> shut
+<pos><b># a.</b></pos>
+بسته: closed, shut, bound, barred, frozen, pent
+مسدود: closed, shut, barred
+<pos><b># v.</b></pos>
+بستن: close, shut, shut down, block, fasten, seal
+بسته شدن: closure, shut, shut down, set in
+تعطیل کردن: shut down, shut, stop, vacate, prorogate, prorogue
+مسدود کردن: block, clog, shut off, close, barricade, shut
+برهم نهادن: shut
+جوش دادن: weld, vulcanize, shut, solder
+تعطیل شدن: shut down, prorogue, shut, prorogate
+پایین اوردن: lower, pull down, bate, disrate, shut
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word153" class="word-container">
+    <div class="word-title" onclick="toggleContent('word153')"><span class="toggle">></span> sincere</div>
+    <button class="mark-read-button" onclick="togglePosition('word153')">mark</button>
+    <div class="content" onclick="toggleContent('word153')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+sincere
+---------
+مخلص - بی ریا - صمیمانه
+
+=========
+<gray>0_0: Translations of</gray> sincere
+<pos><b># a.</b></pos>
+صادق: honest, truthful, sincere, loyal, frank, veridical
+صمیمی: sincere, intimate, cordial, warm, heartfelt, hearty
+مخلص: sincere
+خالص: net, pure, genuine, sheer, solid, sincere
+بی ریا: unaffected, heartfelt, sincere, candid, naive, naif
+قلبی: heartfelt, sincere, hearty, candid
+راست نما: likely, sincere
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word154" class="word-container">
+    <div class="word-title" onclick="toggleContent('word154')"><span class="toggle">></span> sink</div>
+    <button class="mark-read-button" onclick="togglePosition('word154')">mark</button>
+    <div class="content" onclick="toggleContent('word154')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+sink
+---------
+فرو رفتن
+
+=========
+<gray>0_0: Translations of</gray> sink
+<pos><b># v.</b></pos>
+فرو رفتن: dive, sink, immerge, founder, merge
+غرق شدن: sink, drown, go down, merge
+نزول کردن: sink, come down, descend
+مستغرق بودن: sink
+فرو بردن: plunge, immerse, stab, dig in, swallow, sink
+ته رفتن: sink
+نشست کردن: extravasate, settle, sink, subside
+گود افتادن: sink
+<pos><b># n.</b></pos>
+چاهک: sink, sump
+لگن دستشویی: washbasin, sink, washbowl
+دست شویی اشپزخانه: sink
+وان دستشویی: sink
+رسوخ: seepage, sink, seep, ooze, transfusion, transudation
+ته نشینی: sedimentation, precipitation, settlement, sink, alluvion, illuviation
+حفره یا گودال: sink
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word155" class="word-container">
+    <div class="word-title" onclick="toggleContent('word155')"><span class="toggle">></span> situated</div>
+    <button class="mark-read-button" onclick="togglePosition('word155')">mark</button>
+    <div class="content" onclick="toggleContent('word155')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+situated
+---------
+واقع شده است
+
+=========
+<gray>0_0: Translations of</gray> situated
+<pos><b># a.</b></pos>
+واقع در: situated, situated
+واقع شده در: situated
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word156" class="word-container">
+    <div class="word-title" onclick="toggleContent('word156')"><span class="toggle">></span> sleeve</div>
+    <button class="mark-read-button" onclick="togglePosition('word156')">mark</button>
+    <div class="content" onclick="toggleContent('word156')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+sleeve
+---------
+آستین
+
+=========
+<gray>0_0: Translations of</gray> sleeve
+<pos><b># n.</b></pos>
+استین: sleeve
+<pos><b># v.</b></pos>
+استین زدن به: sleeve
+در استین داشتن: sleeve
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word157" class="word-container">
+    <div class="word-title" onclick="toggleContent('word157')"><span class="toggle">></span> slight</div>
+    <button class="mark-read-button" onclick="togglePosition('word157')">mark</button>
+    <div class="content" onclick="toggleContent('word157')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+slight
+---------
+اندک
+
+=========
+<gray>0_0: Translations of</gray> slight
+<pos><b># a.</b></pos>
+اندک: little, slight, low, scarce, scant, light
+جزئی: slight, small, fiddling, immaterial, inappreciative, inconsiderable
+خفیف: slight, light, small, abject, lightweight
+کم: low, little, small, light, rare, slight
+لاغر: lean, skinny, thin, slim, emaciated, slight
+نحیف: frail, haggard, skimpy, thin, lank, slight
+حقیر: little, runty, slight
+ناچیز شماری: slight
+صیقلی: smooth, glossy, sleek, shiny, reflective, slight
+باریک اندام: slim, slight, slimpsy, slimsy
+کودن: dull, dimwitted, slow, unintelligent, backward, slight
+قلیل: scarce, scrimp, skimpy, negligible, insignificant, slight
+پست: inferior, lowly, despicable, mean, vile, slight
+<pos><b># n.</b></pos>
+بی اعتنایی: defiance, inattention, scorn, slight, insouciance, incaution
+تحقیر: humiliation, contempt, disdain, scorn, humility, slight
+تراز: balance, level, flush, surface, slight, surface plate
+شخص بی اهمیت: slight, Tom Thumb
+<pos><b># v.</b></pos>
+ناچیز شمردن: underrate, cheapen, misprize, slight, vilipend
+تراز کردن: level, line, slight
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word158" class="word-container">
+    <div class="word-title" onclick="toggleContent('word158')"><span class="toggle">></span> solitary</div>
+    <button class="mark-read-button" onclick="togglePosition('word158')">mark</button>
+    <div class="content" onclick="toggleContent('word158')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+solitary
+---------
+منفرد، مجد، تنها، منزوی، انفرادی
+
+=========
+<gray>0_0: Translations of</gray> solitary
+<pos><b># a.</b></pos>
+منفرد: single, singular, solitary
+تنها: only, alone, single, lonely, lone, solitary
+منزوی: secluded, solitary, insular, cloistered, retired, offish
+مجرد: single, immaterial, abstract, solitary, celibate, incorporeal
+تک: single, one, individual, solo, lone, solitary
+پرت: flung, deviated, digressed, outlying, solitary, wide
+<pos><b># n.</b></pos>
+گوشه نشین: hermit, recluse, anchoret, anchorite, solitary, solitudinarian
+عابد: hermit, anchoret, ascetic, eremite, solitary
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word159" class="word-container">
+    <div class="word-title" onclick="toggleContent('word159')"><span class="toggle">></span> somewhat</div>
+    <button class="mark-read-button" onclick="togglePosition('word159')">mark</button>
+    <div class="content" onclick="toggleContent('word159')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+somewhat
+---------
+تاحدی
+
+=========
+<gray>0_0: Translations of</gray> somewhat
+<pos><b># a.</b></pos>
+قدری: some, little, somewhat, slightly, something
+تاحدی: somewhat, partly, some, pretty, kind of, nearly
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word160" class="word-container">
+    <div class="word-title" onclick="toggleContent('word160')"><span class="toggle">></span> spectators</div>
+    <button class="mark-read-button" onclick="togglePosition('word160')">mark</button>
+    <div class="content" onclick="toggleContent('word160')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+spectators
+---------
+تماشاگران
+
+=========
+<gray>0_0: Translations of</gray> spectators
+<pos><b># n.</b></pos>
+تماشاگر: spectator, viewer, bystander, onlooker
+بیننده: viewer, spectator, seer, bystander, looker on
+ناظر: supervisor, bystander, overseer, viewer, spectator, steward
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word161" class="word-container">
+    <div class="word-title" onclick="toggleContent('word161')"><span class="toggle">></span> spine</div>
+    <button class="mark-read-button" onclick="togglePosition('word161')">mark</button>
+    <div class="content" onclick="toggleContent('word161')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+spine
+---------
+ستون فقرات
+
+=========
+<gray>0_0: Translations of</gray> spine
+<pos><b># n.</b></pos>
+ستون فقرات: backbone, spine, spinal column, vertebral column, vertebral column, vertebra
+تیره پشت: spine, rachis, spinal column, vertebral column
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word162" class="word-container">
+    <div class="word-title" onclick="toggleContent('word162')"><span class="toggle">></span> spite</div>
+    <button class="mark-read-button" onclick="togglePosition('word162')">mark</button>
+    <div class="content" onclick="toggleContent('word162')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+spite
+---------
+با وجود
+
+=========
+<gray>0_0: Translations of</gray> spite
+<pos><b># n.</b></pos>
+بغض: hatred, spite
+کینه: hatred, grudge, spite, vengeance, rancor, enmity
+لج: spite, grudge, grouch
+بدخواهی: malevolence, malice, rancor, spite, malignancy, disaffection
+غرض: purpose, intention, motive, prejudice, grudge, spite
+<pos><b># v.</b></pos>
+کینه ورزیدن: hate, spite
+برسرلج اوردن: spite
+خشمگین کردن: anger, infuriate, vex, aggravate, make angry, spite
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word163" class="word-container">
+    <div class="word-title" onclick="toggleContent('word163')"><span class="toggle">></span> stain</div>
+    <button class="mark-read-button" onclick="togglePosition('word163')">mark</button>
+    <div class="content" onclick="toggleContent('word163')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+stain
+---------
+لکه دار کردن
+
+=========
+<gray>0_0: Translations of</gray> stain
+<pos><b># n.</b></pos>
+لکه: spot, stain, blob, smudge, smear, blot
+لک: stain, spot, speck, blot, stigma
+ننگ: shame, dishonor, infamy, reproach, scandal, stain
+زنگ زدگی: corrosion, stain
+داغ: brand, stigma, mark, scorcher, stain, stamp
+الودگی: contamination, pollution, filth, impurity, purulence, stain
+الایش: contamination, stain
+<pos><b># v.</b></pos>
+لکه دار کردن: blemish, tarnish, foul, taint, smear, stain
+چرک کردن: stain, begrime, fester, grime, moil, draggle
+رنگ کردن: paint, color, dye, taint, besmear, stain
+زنگ زدن: ring, corrode, rust, hang up, oxidize, stain
+رنگ شدن: paint, stain
+رنگ پس دادن: stain
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word164" class="word-container">
+    <div class="word-title" onclick="toggleContent('word164')"><span class="toggle">></span> strict</div>
+    <button class="mark-read-button" onclick="togglePosition('word164')">mark</button>
+    <div class="content" onclick="toggleContent('word164')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+strict
+---------
+سخت گیرانه
+
+=========
+<gray>0_0: Translations of</gray> strict
+<pos><b># a.</b></pos>
+اکید: strict
+سخت: hard, difficult, tough, strict, rigid, solid
+سخت گیر: strict, intransigent, stern, exacting, squeamish, hard
+محض: pure, sheer, mere, strict, only, downright
+محکم: sturdy, strong, firm, solid, tight, strict
+موکد: strict, emphatic, emphasized, corroborated, forceful
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word165" class="word-container">
+    <div class="word-title" onclick="toggleContent('word165')"><span class="toggle">></span> strip</div>
+    <button class="mark-read-button" onclick="togglePosition('word165')">mark</button>
+    <div class="content" onclick="toggleContent('word165')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+strip
+---------
+نوار
+
+=========
+<gray>0_0: Translations of</gray> strip
+<pos><b># n.</b></pos>
+نوار: strip, tape, band, ribbon, braid, swath
+باریکه: tab, strip, slip, belt, isthmus, slice
+خش: flinders, garbage, hack, hatch, notch, strip
+<pos><b># v.</b></pos>
+برهنه کردن: disrobe, bare, denude, strip, uncover
+محروم کردن از: strip
+لخت کردن: fleece, ransack, strip, harry, pluck, rake up
+چاک دادن: kerf, incise, rift, scotch, slash, strip
+تهی کردن: evacuate, deplete, eviscerate, exhaust, purge, strip
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word166" class="word-container">
+    <div class="word-title" onclick="toggleContent('word166')"><span class="toggle">></span> sue</div>
+    <button class="mark-read-button" onclick="togglePosition('word166')">mark</button>
+    <div class="content" onclick="toggleContent('word166')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+sue
+---------
+شکایت کند
+
+=========
+<gray>0_0: Translations of</gray> sue
+<pos><b># v.</b></pos>
+تعقیب کردن: pursue, chase, follow, chevy, sue, chivvy
+تقاضا کردن: request, demand, adjure, beseech, bone, sue
+تعقیب قانونی کردن: litigate, indict, law, prosecute, sue
+دعوی کردن: pretend, quarrel, sue
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word167" class="word-container">
+    <div class="word-title" onclick="toggleContent('word167')"><span class="toggle">></span> surf</div>
+    <button class="mark-read-button" onclick="togglePosition('word167')">mark</button>
+    <div class="content" onclick="toggleContent('word167')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+surf
+---------
+موج سواری
+
+=========
+<gray>0_0: Translations of</gray> surf
+<pos><b># n.</b></pos>
+خیزاب دریاکنار: surf
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word168" class="word-container">
+    <div class="word-title" onclick="toggleContent('word168')"><span class="toggle">></span> sweep</div>
+    <button class="mark-read-button" onclick="togglePosition('word168')">mark</button>
+    <div class="content" onclick="toggleContent('word168')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+sweep
+---------
+جارو کردن
+
+=========
+<gray>0_0: Translations of</gray> sweep
+<pos><b># n.</b></pos>
+جارو: sweep
+رفت و برگشت: sweep
+وسعت میدان دید: sweep
+<pos><b># v.</b></pos>
+زدودن: remove, eliminate, clear, wipe, sweep, obliterate
+جاروب کردن: sweep, wisp, broom, scavenge, whisk
+رفتن: go, out, leave, come, betake, sweep
+روبیدن: sweep
+روفتن: sweep
+بسرعت گذشتن از: sweep
+از این سو بان سو حرکت دادن: sweep
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word169" class="word-container">
+    <div class="word-title" onclick="toggleContent('word169')"><span class="toggle">></span> swing</div>
+    <button class="mark-read-button" onclick="togglePosition('word169')">mark</button>
+    <div class="content" onclick="toggleContent('word169')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+swing
+---------
+تاب خوردن
+
+=========
+<gray>0_0: Translations of</gray> swing
+<pos><b># n.</b></pos>
+نوسان: oscillation, swing, sway, fluctuation, vibration, pulsation
+تاب: swing, twist, glow, tolerance, insinuation, sway
+الاکلنگ: swing, flip-flop
+اهتزاز: flutter, swing, sway, waft, vibration, pulsation
+اونگ: pendulum, swing
+نوعی رقص واهنگ ان: swing
+<pos><b># v.</b></pos>
+تلو تلو خوردن: stumble, wobble, stagger, lurch, swing, reel
+تاب خوردن: swing, twist, sway, oscillate
+نوسان کردن: oscillate, fluctuate, swing, jib, waver, vacillate
+تاب دادن: swing, swag, twist
+اونگان شدن یا کردن: swing
+چرخیدن: turn, spin, rotate, revolve, whirl, swing
+بدار اویخته شدن: hang, swing
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word170" class="word-container">
+    <div class="word-title" onclick="toggleContent('word170')"><span class="toggle">></span> sword</div>
+    <button class="mark-read-button" onclick="togglePosition('word170')">mark</button>
+    <div class="content" onclick="toggleContent('word170')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+sword
+---------
+شمشیر
+
+=========
+<gray>0_0: Translations of</gray> sword
+<pos><b># n.</b></pos>
+شمشیر: sword, saber, blade, scimitar, knife, bolo
+تیغ: blade, sword, thorn, acicula, beam, bur
+قداره: broadsword, sword, bolo, falchion, sabre
+عدالت: justice, fairness, sword
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word171" class="word-container">
+    <div class="word-title" onclick="toggleContent('word171')"><span class="toggle">></span> tale</div>
+    <button class="mark-read-button" onclick="togglePosition('word171')">mark</button>
+    <div class="content" onclick="toggleContent('word171')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+tale
+---------
+داستان
+
+=========
+<gray>0_0: Translations of</gray> tale
+<pos><b># n.</b></pos>
+داستان: story, tale, fiction, narrative, narration, fable
+قصه: story, tale, narrative, fiction, make-believe
+افسانه: legend, myth, tale, fable, fiction, mythos
+حکایت: anecdote, story, tale, narrative, account, allegory
+روایت: narrative, story, tale, exemplum
+حساب: account, arithmetic, calculation, counting, tally, tale
+شرح: description, explanation, account, exposition, statement, tale
+چغلی: denunciation, rumor, delation, rumble, tale, rumour
+جمع: sum, total, plural, addition, aggregate, tale
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word172" class="word-container">
+    <div class="word-title" onclick="toggleContent('word172')"><span class="toggle">></span> talkative</div>
+    <button class="mark-read-button" onclick="togglePosition('word172')">mark</button>
+    <div class="content" onclick="toggleContent('word172')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+talkative
+---------
+پرحرف
+
+=========
+<gray>0_0: Translations of</gray> talkative
+<pos><b># a.</b></pos>
+پر حرف: talkative, babbling, talky, chatty, loquacious, flippant
+پرگو: verbose, talkative, loquacious, prolix, long-winded
+وراج: chatty, loquacious, talkative, loud-mouthed
+بسگوی: talkative
+پرچانه: persnickety, pernickety, talkative
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word173" class="word-container">
+    <div class="word-title" onclick="toggleContent('word173')"><span class="toggle">></span> though</div>
+    <button class="mark-read-button" onclick="togglePosition('word173')">mark</button>
+    <div class="content" onclick="toggleContent('word173')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+though
+---------
+اگر چه
+
+=========
+<gray>0_0: Translations of</gray> though
+<pos><b># c.</b></pos>
+اگر چه: although, though, however, albeit, howbeit
+گرچه: although, though
+ولی: but, yet, though
+ولو: though
+هر چند با اینکه: though
+<pos><b># a.</b></pos>
+باوجود اینکه: though, notwithstanding
+بهر حال: however, anyway, though, howsoever, anyhow, nohow
+باوجود ان: though
+بهرجهت: anyhow, though
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word174" class="word-container">
+    <div class="word-title" onclick="toggleContent('word174')"><span class="toggle">></span> tissue</div>
+    <button class="mark-read-button" onclick="togglePosition('word174')">mark</button>
+    <div class="content" onclick="toggleContent('word174')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+tissue
+---------
+بافت
+
+=========
+<gray>0_0: Translations of</gray> tissue
+<pos><b># n.</b></pos>
+بافت: tissue, texture, weave, fiber, contexture, fibre
+پارچه: cloth, fabric, textile, tissue, piece, lot
+نسج: tissue
+بافته: tissue, web, texture, mesh, wale
+تنیده: tissue, web
+رشته: string, field, thread, series, strand, tissue
+منسوج: textile, tissue
+پارچهء بافته: tissue
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word175" class="word-container">
+    <div class="word-title" onclick="toggleContent('word175')"><span class="toggle">></span> urge</div>
+    <button class="mark-read-button" onclick="togglePosition('word175')">mark</button>
+    <div class="content" onclick="toggleContent('word175')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+urge
+---------
+اصرار
+
+=========
+<gray>0_0: Translations of</gray> urge
+<pos><b># v.</b></pos>
+اصرار کردن: stick out, urge, haggle, persist
+با اصرار وادار کردن: urge
+انگیختن: stimulate, motivate, incite, animate, fire, urge
+تسریع شدن: quicken, urge
+ابرام کردن: importune, urge
+<pos><b># n.</b></pos>
+انگیزش: motivation, stimulation, urge, incitement, provocation, animation
+مناسبت: relation, reason, relationship, connection, urge, motive
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word176" class="word-container">
+    <div class="word-title" onclick="toggleContent('word176')"><span class="toggle">></span> wheat</div>
+    <button class="mark-read-button" onclick="togglePosition('word176')">mark</button>
+    <div class="content" onclick="toggleContent('word176')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+wheat
+---------
+گندم
+
+=========
+<gray>0_0: Translations of</gray> wheat
+<pos><b># n.</b></pos>
+گندم: wheat
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word177" class="word-container">
+    <div class="word-title" onclick="toggleContent('word177')"><span class="toggle">></span> wheel</div>
+    <button class="mark-read-button" onclick="togglePosition('word177')">mark</button>
+    <div class="content" onclick="toggleContent('word177')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+wheel
+---------
+چرخ
+
+=========
+<gray>0_0: Translations of</gray> wheel
+<pos><b># n.</b></pos>
+چرخ: wheel, cart, cycle, axle, flywheel, turn
+چرخش: rotation, spin, turn, swirl, revolution, wheel
+دور: circle, cycle, orbit, revolution, circuit, wheel
+رل ماشین: wheel
+<pos><b># v.</b></pos>
+چرخیدن: turn, spin, rotate, revolve, whirl, wheel
+گرداندن: turn, operate, inflect, manage, wheel, wrest
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word178" class="word-container">
+    <div class="word-title" onclick="toggleContent('word178')"><span class="toggle">></span> whether</div>
+    <button class="mark-read-button" onclick="togglePosition('word178')">mark</button>
+    <div class="content" onclick="toggleContent('word178')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+whether
+---------
+چه
+
+=========
+<gray>0_0: Translations of</gray> whether
+<pos><b># c.</b></pos>
+چه: whether, or, as, if, because
+خواه: whether, or, if
+ایا: whether, if
+<pos><b># p.</b></pos>
+چه: what, whether, any
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word179" class="word-container">
+    <div class="word-title" onclick="toggleContent('word179')"><span class="toggle">></span> whisper</div>
+    <button class="mark-read-button" onclick="togglePosition('word179')">mark</button>
+    <div class="content" onclick="toggleContent('word179')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+whisper
+---------
+نجوا
+
+=========
+<gray>0_0: Translations of</gray> whisper
+<pos><b># n.</b></pos>
+نجوا: whisper
+پچ پچ: chatter, whisper, prate
+بیخ گوشی: susurration, whisper
+<pos><b># v.</b></pos>
+نجوا کردن: whisper, whisper
+پچ پچ کردن: chatter, whisper
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word180" class="word-container">
+    <div class="word-title" onclick="toggleContent('word180')"><span class="toggle">></span> wipe</div>
+    <button class="mark-read-button" onclick="togglePosition('word180')">mark</button>
+    <div class="content" onclick="toggleContent('word180')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+wipe
+---------
+پاک کن
+
+=========
+<gray>0_0: Translations of</gray> wipe
+<pos><b># v.</b></pos>
+پاک کردن: erase, clean, wipe, purify, cleanse, mop
+زدودن: remove, eliminate, clear, wipe, sweep, obliterate
+خشک کردن: dry, dehumidify, wither, desiccate, wipe, calcine
+از میان بردن: abolish, wipe, abrogate, shunt
+بوسیله مالش پاک کردن: wipe
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word181" class="word-container">
+    <div class="word-title" onclick="toggleContent('word181')"><span class="toggle">></span> witch</div>
+    <button class="mark-read-button" onclick="togglePosition('word181')">mark</button>
+    <div class="content" onclick="toggleContent('word181')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+witch
+---------
+جادوگر
+
+=========
+<gray>0_0: Translations of</gray> witch
+<pos><b># n.</b></pos>
+ساحره: witch, fairy, hag, lamia, sibyl, hellcat
+زن جادوگر: witch
+عفریته: sorceress, witch, Hecate, hag, afreet, beldam
+پیرهزن: witch
+<pos><b># v.</b></pos>
+مجذوب کردن: fascinate, witch, attract, spellbind
+افسون کردن: bewitch, charm, enchant, fascinate, voodoo, witch
+سحر کردن: conjure, enchant, fascinate, spellbind, witch, practise magic
+</p>
+</body>
+</html></div>
+</div>
+
+<div id="word182" class="word-container">
+    <div class="word-title" onclick="toggleContent('word182')"><span class="toggle">></span> within</div>
+    <button class="mark-read-button" onclick="togglePosition('word182')">mark</button>
+    <div class="content" onclick="toggleContent('word182')"><html>
+<head>
+        <style type="text/css">
+        p {white-space: pre-wrap;}
+        pos {color: #afb7f3;}
+        example {color: #008080;}
+        gray {color: #606060;}
+        </style>
+</head>
+<body>
+<p><gray>^_^: Translate</gray> en <gray>To</gray> fa
+within
+---------
+در داخل
+
+=========
+<gray>0_0: Translations of</gray> within
+<pos><b># a.</b></pos>
+در داخل: within, withindoors
+در حصار: within
+باندازه: enough, within, snug
+در توی: ben, within
+<pos><b># p.</b></pos>
+در ظرف: within, in, into, through
+در مدت: within, during, for, pending
+در حدود: about, within, circa
+توی: in, into, within, aboard
+</p>
+</body>
+</html></div>
+</div>
+
+</div>
+</body>
+</html>
